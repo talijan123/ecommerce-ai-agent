@@ -1,0 +1,38 @@
+"""
+SQLAlchemy Model for Abandoned Cart Sessions and Recovery Discounts.
+"""
+
+from datetime import datetime, timezone
+from sqlalchemy import Column, Integer, String, Boolean, JSON, DateTime
+from app.core.database import Base
+
+
+class CartSession(Base):
+    __tablename__ = "cart_sessions"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    session_id = Column(String(100), unique=True, index=True, nullable=False)
+    customer_email = Column(String(150), index=True, nullable=False)
+    abandoned_items = Column(JSON, default=list, nullable=False)
+    discount_eligible = Column(Boolean, default=True, nullable=False)
+    discount_code = Column(String(50), nullable=True)
+    discount_percentage = Column(Integer, default=10, nullable=False)
+    expires_in_hours = Column(Integer, default=24, nullable=False)
+    ineligibility_reason = Column(String(255), nullable=True)
+    is_recovered = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "customer_email": self.customer_email,
+            "abandoned_items": self.abandoned_items,
+            "discount_eligible": self.discount_eligible,
+            "discount_code": self.discount_code,
+            "discount_percentage": self.discount_percentage,
+            "expires_in_hours": self.expires_in_hours,
+            "ineligibility_reason": self.ineligibility_reason,
+            "is_recovered": self.is_recovered,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
