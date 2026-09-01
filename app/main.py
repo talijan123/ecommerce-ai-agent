@@ -21,7 +21,10 @@ async def lifespan(app: FastAPI):
     - Runs on shutdown: Cleanly cleans up resources.
     """
     # Create tables automatically on startup
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"Database initialization warning: {e}")
     yield
 
 

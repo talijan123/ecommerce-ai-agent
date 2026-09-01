@@ -1,4 +1,7 @@
 {
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/.next",
+  "framework": "nextjs",
   "rewrites": [
     {
       "source": "/api/(.*)",
@@ -11,10 +14,6 @@
     {
       "source": "/whatsapp/(.*)",
       "destination": "/api/index.py"
-    },
-    {
-      "source": "/((?!api/|chat/|whatsapp/).*)",
-      "destination": "/frontend/$1"
     }
   ]
 }
