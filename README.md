@@ -1,4 +1,19 @@
-# 🛍️ Production-Grade Autonomous E-Commerce AI Agent (FastAPI + Meta WhatsApp Cloud API + Next.js)
+---
+title: Ecommerce Backend
+emoji: 🛒
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+# E-commerce AI Agent Backend
+FastAPI backend service running on Hugging Face Spaces.
+
+---
+
+## 🛍️ Production-Grade Autonomous E-Commerce AI Agent (FastAPI + Meta WhatsApp Cloud API + Next.js)
 
 A production-ready multi-channel AI platform for **Autonomous E-Commerce Customer Service** powered by **FastAPI**, **SQLAlchemy** (PostgreSQL / Supabase / SQLite), **Meta WhatsApp Cloud API**, **Groq / OpenAI Tool Calling**, and a **Next.js Merchant Dashboard**.
 
