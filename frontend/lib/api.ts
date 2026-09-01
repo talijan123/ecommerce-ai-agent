@@ -2,7 +2,10 @@
  * Typed API Client for FastAPI Autonomous E-Commerce Backend.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "";
 
 export interface ToolInvocationLog {
   tool_name: string;

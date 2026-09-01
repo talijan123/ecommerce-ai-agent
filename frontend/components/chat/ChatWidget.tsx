@@ -90,7 +90,7 @@ export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidg
         {
           role: "assistant",
           content:
-            "⚠️ Sorry, I couldn't reach the store server. Please check if the FastAPI backend is running on `http://localhost:8000`.",
+            "⚠️ Sorry, I couldn't reach the store server. Please check your network connection or server status.",
         },
       ]);
     } finally {
