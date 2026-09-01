@@ -97,7 +97,9 @@ export const api = {
       }),
     });
     if (!res.ok) {
-      throw new Error(`Chat API error: ${res.statusText}`);
+      const errData = await res.json().catch(() => null);
+      const detail = errData?.detail || errData?.message || errData?.response || res.statusText;
+      throw new Error(`Chat API error: ${detail}`);
     }
     return res.json();
   },

@@ -53,9 +53,12 @@ def send_chat_message(
         )
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal Agent Error: {str(e)}"
+        return ChatResponse(
+            session_id=payload.session_id,
+            response=f"⚠️ Notice: Unable to complete conversation turn ({str(e)}). Please verify backend environment configuration.",
+            tools_invoked=[],
+            success=False,
+            error=str(e),
         )
 
 

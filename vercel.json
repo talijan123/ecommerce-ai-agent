@@ -17,7 +17,15 @@
       "destination": "/api/index.py"
     },
     {
+      "source": "/chat",
+      "destination": "/api/index.py"
+    },
+    {
       "source": "/chat/(.*)",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/whatsapp",
       "destination": "/api/index.py"
     },
     {

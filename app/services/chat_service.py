@@ -15,24 +15,27 @@ class ChatService:
         """
         Fetch recent messages for a session formatted for OpenAI chat completions.
         """
-        records = self.db.query(ChatHistory).filter(
-            ChatHistory.session_id == session_id
-        ).order_by(ChatHistory.created_at.asc()).limit(limit).all()
+        try:
+            records = self.db.query(ChatHistory).filter(
+                ChatHistory.session_id == session_id
+            ).order_by(ChatHistory.created_at.asc()).limit(limit).all()
 
-        formatted_messages = []
-        for r in records:
-            msg: Dict[str, Any] = {"role": r.role}
-            if r.content:
-                msg["content"] = r.content
-            if r.tool_calls:
-                msg["tool_calls"] = r.tool_calls
-            if r.tool_call_id:
-                msg["tool_call_id"] = r.tool_call_id
-            if r.name:
-                msg["name"] = r.name
-            formatted_messages.append(msg)
+            formatted_messages = []
+            for r in records:
+                msg: Dict[str, Any] = {"role": r.role}
+                if r.content:
+                    msg["content"] = r.content
+                if r.tool_calls:
+                    msg["tool_calls"] = r.tool_calls
+                if r.tool_call_id:
+                    msg["tool_call_id"] = r.tool_call_id
+                if r.name:
+                    msg["name"] = r.name
+                formatted_messages.append(msg)
 
-        return formatted_messages
+            return formatted_messages
+        except Exception:
+            return []
 
     def add_message(
         self,
@@ -42,19 +45,26 @@ class ChatService:
         tool_calls: Optional[List[Dict[str, Any]]] = None,
         tool_call_id: Optional[str] = None,
         name: Optional[str] = None,
-    ) -> ChatHistory:
+    ) -> Optional[ChatHistory]:
         """
         Store a message or tool execution step in the database.
         """
-        record = ChatHistory(
-            session_id=session_id,
-            role=role,
-            content=content,
-            tool_calls=tool_calls,
-            tool_call_id=tool_call_id,
-            name=name,
-        )
-        self.db.add(record)
-        self.db.commit()
-        self.db.refresh(record)
-        return record
+        try:
+            record = ChatHistory(
+                session_id=session_id,
+                role=role,
+                content=content,
+                tool_calls=tool_calls,
+                tool_call_id=tool_call_id,
+                name=name,
+            )
+            self.db.add(record)
+            self.db.commit()
+            self.db.refresh(record)
+            return record
+        except Exception:
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
+            return None
