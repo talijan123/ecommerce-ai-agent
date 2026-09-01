@@ -85,12 +85,16 @@ export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidg
 
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err: any) {
+      const errMsg =
+        err?.message && err.message.trim() !== "" && err.message !== "Chat API error: "
+          ? err.message
+          : "⚠️ Unable to connect to the store backend. Please verify your connection or backend status.";
+
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content:
-            err?.message || "⚠️ Sorry, I couldn't reach the store server. Please check your connection and try again.",
+          content: errMsg,
         },
       ]);
     } finally {

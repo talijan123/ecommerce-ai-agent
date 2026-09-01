@@ -88,10 +88,10 @@ def run_agent_turn(
     tools_invoked_log: List[Dict[str, Any]] = []
 
     if client is None:
-        # Fallback simulation when no live OpenAI key is configured
+        # Fallback simulation when no live Groq or OpenAI key is configured
         fallback_msg = (
-            "⚠️ [API Notice]: OPENAI_API_KEY is not configured in `.env`. "
-            "Please configure your OpenAI API key to enable live AI tool execution."
+            "⚠️ [API Notice]: Neither GROQ_API_KEY nor OPENAI_API_KEY is configured in the environment. "
+            "Please configure your API key in environment variables to enable live AI responses."
         )
         chat_service.add_message(session_id=session_id, role="assistant", content=fallback_msg)
         return fallback_msg, [], True

@@ -65,9 +65,15 @@ def root():
 
 @app.get("/health", tags=["System"])
 @app.get("/api/health", tags=["System"])
+@app.get("/api/v1/health", tags=["System"])
 def health_check():
-    """Health check endpoint for container orchestrators & load balancers."""
-    return {"status": "healthy"}
+    """Health check endpoint for container orchestrators, dashboards, and load balancers."""
+    return {
+        "status": "healthy",
+        "service": settings.PROJECT_NAME,
+        "version": settings.VERSION,
+        "operational": True,
+    }
 
 
 @app.exception_handler(Exception)

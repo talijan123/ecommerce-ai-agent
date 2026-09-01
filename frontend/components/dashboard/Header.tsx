@@ -40,7 +40,7 @@ export function Header({ title, description, onRefresh, onOpenSimulator }: Heade
           {isBackendHealthy === null
             ? "Checking API..."
             : isBackendHealthy
-            ? "API Online (:8000)"
+            ? "API Online"
             : "API Offline"}
         </Badge>
 

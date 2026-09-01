@@ -87,21 +87,36 @@ export interface Order {
 export const api = {
   // Chat APIs
   async sendChatMessage(sessionId: string, message: string, customerEmail?: string): Promise<ChatResponse> {
-    const res = await fetch(`${API_BASE_URL}/api/v1/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        session_id: sessionId,
-        message,
-        customer_email: customerEmail || undefined,
-      }),
-    });
-    if (!res.ok) {
-      const errData = await res.json().catch(() => null);
-      const detail = errData?.detail || errData?.message || errData?.response || res.statusText;
-      throw new Error(`Chat API error: ${detail}`);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          message,
+          customer_email: customerEmail || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const errData = await res.json();
+          detail = errData?.detail || errData?.message || errData?.response || errData?.error || JSON.stringify(errData);
+        } catch {
+          detail = await res.text().catch(() => "");
+        }
+        const errorText = detail && detail.trim() ? detail : `Server returned HTTP ${res.status} (${res.statusText})`;
+        throw new Error(errorText);
+      }
+
+      return await res.json();
+    } catch (err: any) {
+      if (err instanceof Error && err.message) {
+        throw err;
+      }
+      throw new Error(String(err) || "Failed to reach chat service.");
     }
-    return res.json();
   },
 
   async getChatHistory(sessionId: string): Promise<ChatHistoryRecord[]> {
@@ -174,11 +189,26 @@ export const api = {
   },
 
   async checkHealth(): Promise<boolean> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/health`);
-      return res.ok;
-    } catch {
-      return false;
+    const healthEndpoints = ["/health", "/api/health", "/api/v1/health", "/"];
+    for (const ep of healthEndpoints) {
+      try {
+        const res = await fetch(`${API_BASE_URL}${ep}`);
+        if (res.ok) {
+          const data = await res.json().catch(() => null);
+          if (
+            !data ||
+            data.status === "healthy" ||
+            data.status === "operational" ||
+            data.operational === true ||
+            res.status === 200
+          ) {
+            return true;
+          }
+        }
+      } catch {
+        // try next endpoint
+      }
     }
+    return false;
   },
 };
