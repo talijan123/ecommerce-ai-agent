@@ -7,3 +7,8 @@ if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
 from app.main import app
+
+
+@app.get("/")
+def root_check():
+    return {"status": "ok", "service": "FastAPI Backend"}
