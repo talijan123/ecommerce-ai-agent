@@ -2,10 +2,11 @@
  * Typed API Client for FastAPI Autonomous E-Commerce Backend.
  */
 
-const API_BASE_URL =
+const rawBaseUrl =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   "";
+const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "");
 
 export interface ToolInvocationLog {
   tool_name: string;
