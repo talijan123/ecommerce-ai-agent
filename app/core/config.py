@@ -4,7 +4,7 @@ Loads environment variables seamlessly from .env file or system environment.
 """
 
 from typing import List, Union
-from pydantic import AnyHttpUrl, field_validator
+from pydantic import AnyHttpUrl, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,23 +15,31 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # LLM Provider Settings (Groq / OpenAI / Any OpenAI-compatible provider)
-    GROQ_API_KEY: str = ""
-    OPENAI_API_KEY: str = ""
-    LLM_BASE_URL: str = "https://api.groq.com/openai/v1"
-    LLM_MODEL: str = "llama-3.3-70b-versatile"
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    GROQ_API_KEY: str = Field(default="")
+    OPENAI_API_KEY: str = Field(default="")
+    LLM_BASE_URL: str = Field(default="https://api.groq.com/openai/v1")
+    LLM_MODEL: str = Field(default="llama-3.3-70b-versatile")
+    OPENAI_MODEL: str = Field(default="gpt-4o-mini")
 
     # Meta WhatsApp Cloud API Settings
-    WHATSAPP_TOKEN: str = ""
-    WHATSAPP_PHONE_NUMBER_ID: str = ""
-    WHATSAPP_VERIFY_TOKEN: str = "autocommerce_wa_verify_token_123"
-    WHATSAPP_API_VERSION: str = "v21.0"
+    WHATSAPP_TOKEN: str = Field(default="")
+    WHATSAPP_PHONE_NUMBER_ID: str = Field(default="")
+    WHATSAPP_VERIFY_TOKEN: str = Field(default="autocommerce_wa_verify_token_123")
+    WHATSAPP_API_VERSION: str = Field(default="v21.0")
 
     # Database Settings (Defaults to local SQLite, easily switchable to Supabase/PostgreSQL)
-    DATABASE_URL: str = "sqlite:///./ecommerce.db"
+    DATABASE_URL: str = Field(default="sqlite:///./ecommerce.db")
 
     # CORS Origins
-    CORS_ORIGINS: List[str] = ["*"]
+    CORS_ORIGINS: List[str] = Field(default=["*"])
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            if not v.startswith("["):
+                return [i.strip() for i in v.split(",") if i.strip()]
+        return v
 
     model_config = SettingsConfigDict(
         env_file=".env",

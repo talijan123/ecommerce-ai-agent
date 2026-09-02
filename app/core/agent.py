@@ -38,12 +38,10 @@ def get_openai_client() -> Optional[OpenAI]:
     if not api_key or "your_" in api_key:
         return None
 
-    # Use base_url (defaults to Groq https://api.groq.com/openai/v1)
-    base_url = settings.LLM_BASE_URL
-    if settings.GROQ_API_KEY and not settings.OPENAI_API_KEY:
-        base_url = settings.LLM_BASE_URL or "https://api.groq.com/openai/v1"
-
-    return OpenAI(api_key=api_key, base_url=base_url)
+    return OpenAI(
+        api_key=api_key,
+        base_url=settings.LLM_BASE_URL or "https://api.groq.com/openai/v1"
+    )
 
 
 def run_agent_turn(
@@ -100,7 +98,7 @@ def run_agent_turn(
     while turn < max_turns:
         turn += 1
 
-        model_name = settings.LLM_MODEL or (settings.OPENAI_MODEL if settings.OPENAI_API_KEY else "llama-3.3-70b-versatile")
+        model_name = settings.LLM_MODEL or "llama-3.3-70b-versatile"
         try:
             response = client.chat.completions.create(
                 model=model_name,
