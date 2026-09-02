@@ -20,7 +20,7 @@ from app.models.cart import CartSession
 
 def seed_database():
     print("=" * 60)
-    print("🌱 Initializing and Seeding Database...")
+    print("[INFO] Initializing and Seeding Database...")
     print("=" * 60)
 
     # Create tables
@@ -212,7 +212,7 @@ def seed_database():
             db.add(CartSession(**c_data))
 
         db.commit()
-        print("✅ Database successfully seeded:")
+        print("[SUCCESS] Database successfully seeded:")
         print(f"   - {len(products_data)} Products")
         print(f"   - {len(orders_data)} Orders")
         print(f"   - {len(carts_data)} Cart Sessions")
@@ -220,7 +220,7 @@ def seed_database():
 
     except Exception as e:
         db.rollback()
-        print(f"❌ Error seeding database: {e}")
+        print(f"[ERROR] Error seeding database: {e}")
         raise e
     finally:
         db.close()

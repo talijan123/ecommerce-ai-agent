@@ -3,9 +3,14 @@ Application Configuration Module using Pydantic Settings.
 Loads environment variables seamlessly from .env file or system environment.
 """
 
+import os
 from typing import List, Union
 from pydantic import AnyHttpUrl, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+IS_VERCEL = bool(os.environ.get("VERCEL"))
+DEFAULT_DB_URL = "sqlite:////tmp/ecommerce.db" if IS_VERCEL else "sqlite:///./ecommerce.db"
 
 
 class Settings(BaseSettings):
@@ -28,7 +33,7 @@ class Settings(BaseSettings):
     WHATSAPP_API_VERSION: str = Field(default="v21.0")
 
     # Database Settings (Defaults to local SQLite, easily switchable to Supabase/PostgreSQL)
-    DATABASE_URL: str = Field(default="sqlite:///./ecommerce.db")
+    DATABASE_URL: str = Field(default=DEFAULT_DB_URL)
 
     # CORS Origins
     CORS_ORIGINS: List[str] = Field(default=["*"])

@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.database import Base, engine, get_db
+from app.core.database import Base, engine, get_db, ensure_db_initialized, create_db_and_tables
 from app.api.v1.api import api_router
 from app.api.v1.endpoints.admin import list_products
 from app.api.v1.endpoints.chat import send_chat_message
@@ -21,12 +21,11 @@ from app.schemas.chat import ChatRequest, ChatResponse
 async def lifespan(app: FastAPI):
     """
     Application Lifespan:
-    - Runs on startup: Creates all database tables if they do not exist.
+    - Runs on startup: Creates all database tables and seeds mock catalog if empty.
     - Runs on shutdown: Cleanly cleans up resources.
     """
-    # Create tables automatically on startup
     try:
-        Base.metadata.create_all(bind=engine)
+        ensure_db_initialized()
     except Exception as e:
         print(f"Database initialization warning: {e}")
     yield
