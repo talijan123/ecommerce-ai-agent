@@ -69,32 +69,32 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
   };
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-slate-800/60">
-        <CardTitle className="text-base flex items-center gap-2">
+    <Card className="h-full flex flex-col border-zinc-800/80 bg-zinc-900/60 shadow-xl">
+      <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-zinc-800/80">
+        <CardTitle className="text-sm font-bold flex items-center gap-2 text-white">
           <Clock className="h-4 w-4 text-blue-400" />
-          Live AI Agent Activity
+          Live Autonomous AI Activity Feed
         </CardTitle>
-        <Badge variant="success">Real-time</Badge>
+        <Badge variant="success" dot={true}>Real-time Stream</Badge>
       </CardHeader>
 
-      <CardContent className="pt-4 space-y-3 flex-1 overflow-y-auto max-h-[420px]">
+      <CardContent className="pt-4 space-y-3 flex-1 overflow-y-auto max-h-[420px] custom-scrollbar">
         {items.map((item) => (
           <div
             key={item.id}
-            className="p-3.5 rounded-xl border border-slate-800/80 bg-slate-900/40 hover:bg-slate-800/40 transition-all flex items-start gap-3"
+            className="p-3.5 rounded-2xl border border-zinc-800/80 bg-zinc-950/60 hover:bg-zinc-800/40 transition-all flex items-start gap-3"
           >
-            <div className="p-2 rounded-lg bg-slate-800/80 border border-slate-700/60 mt-0.5">
+            <div className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 shrink-0 mt-0.5 shadow-sm">
               {getIcon(item.type)}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2">
-                <h4 className="text-sm font-semibold text-white truncate">{item.title}</h4>
-                <span className="text-[11px] text-slate-400 whitespace-nowrap">{formatDate(item.time)}</span>
+                <h4 className="text-xs font-bold text-white truncate">{item.title}</h4>
+                <span className="text-[10px] text-zinc-400 font-mono whitespace-nowrap">{formatDate(item.time)}</span>
               </div>
-              <p className="text-xs text-slate-300 mt-1 leading-relaxed">{item.description}</p>
+              <p className="text-xs text-zinc-300 mt-1 leading-relaxed">{item.description}</p>
               <div className="mt-2 flex items-center gap-2">
-                <Badge variant={item.status === "Recovered" ? "success" : "default"}>
+                <Badge variant={item.status === "Recovered" ? "success" : "indigo"} className="text-[10px]">
                   <CheckCircle2 className="h-3 w-3" />
                   {item.status}
                 </Badge>

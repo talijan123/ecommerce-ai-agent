@@ -237,20 +237,20 @@ export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidg
 
   // Floating Customer Chat Widget
   return (
-    <div className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-50">
+    <div className="fixed bottom-0 sm:bottom-6 right-0 sm:right-6 z-50">
       {/* Floating Welcome Toast Tooltip (when closed) */}
       {!isOpen && showWelcomeToast && (
-        <div className="absolute bottom-16 right-0 mb-2 w-72 p-3.5 rounded-2xl bg-zinc-900/95 border border-zinc-800/90 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="absolute bottom-16 right-4 sm:right-0 mb-2 w-72 p-3.5 rounded-2xl bg-zinc-900/95 border border-zinc-800/90 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded-lg gradient-blue-indigo flex items-center justify-center text-white shrink-0">
+              <div className="h-6 w-6 rounded-lg gradient-blue-indigo flex items-center justify-center text-white shrink-0 shadow-sm">
                 <Sparkles className="h-3.5 w-3.5" />
               </div>
               <span className="text-xs font-bold text-white">AI Assistant Online</span>
             </div>
             <button
               onClick={() => setShowWelcomeToast(false)}
-              className="text-zinc-400 hover:text-zinc-200 p-0.5"
+              className="text-zinc-400 hover:text-zinc-200 p-0.5 rounded-md hover:bg-zinc-800"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -263,7 +263,7 @@ export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidg
               setShowWelcomeToast(false);
               setIsOpen(true);
             }}
-            className="mt-2.5 w-full py-1.5 px-3 rounded-lg gradient-blue-indigo text-[11px] font-semibold text-white hover:opacity-95 transition-opacity"
+            className="mt-2.5 w-full py-1.5 px-3 rounded-xl gradient-blue-indigo text-[11px] font-semibold text-white hover:opacity-95 transition-opacity shadow-sm"
           >
             Start Chatting →
           </button>
@@ -272,7 +272,7 @@ export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidg
 
       {/* Floating Trigger Launcher Button (when closed) */}
       {!isOpen && (
-        <div className="relative group">
+        <div className="p-4 sm:p-0 relative group">
           {/* Animated Glowing Ring Backdrop */}
           <div className="absolute -inset-0.5 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500 opacity-70 blur-md group-hover:opacity-100 group-hover:blur-lg transition-all duration-300 animate-pulse-slow" />
 
@@ -297,33 +297,32 @@ export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidg
         </div>
       )}
 
-      {/* Expanded Chat Drawer / Window */}
+      {/* Expanded Chat Drawer / Window with Strictly Locked Dimensions */}
       {isOpen && (
         <div
           className={cn(
-            "fixed inset-x-0 bottom-0 sm:inset-auto sm:bottom-0 sm:right-0 bg-zinc-950/95 border border-zinc-800/90 backdrop-blur-2xl shadow-2xl shadow-black/80 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200",
+            "fixed bottom-0 right-0 sm:bottom-0 sm:right-0 bg-zinc-950/95 border border-zinc-800/90 backdrop-blur-2xl shadow-2xl shadow-black/80 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 z-50",
             isExpanded
-              ? "sm:w-[540px] sm:h-[720px] rounded-t-3xl sm:rounded-3xl"
-              : "sm:w-[420px] sm:h-[600px] rounded-t-3xl sm:rounded-3xl",
-            "h-[88vh] sm:h-auto"
+              ? "w-full sm:w-[500px] h-[650px] max-h-[90vh] rounded-t-3xl sm:rounded-3xl"
+              : "w-full sm:w-[400px] md:w-[420px] h-[550px] max-h-[85vh] rounded-t-3xl sm:rounded-3xl"
           )}
         >
-          {/* Header */}
-          <div className="p-3.5 border-b border-zinc-800/80 bg-zinc-900/70 flex items-center justify-between">
+          {/* Header - Strictly Pinned at Top */}
+          <div className="shrink-0 z-10 sticky top-0 p-3.5 border-b border-zinc-800/80 bg-zinc-900/80 backdrop-blur-xl flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-xl gradient-blue-indigo flex items-center justify-center text-white shadow-md shadow-blue-500/20 border border-indigo-400/30">
+              <div className="h-8 w-8 rounded-xl gradient-blue-indigo flex items-center justify-center text-white shadow-md shadow-blue-500/20 border border-indigo-400/30 shrink-0">
                 <Bot className="h-4 w-4" />
               </div>
-              <div>
-                <h3 className="text-xs font-bold text-white flex items-center gap-1.5 leading-none">
+              <div className="min-w-0">
+                <h3 className="text-xs font-bold text-white flex items-center gap-1.5 leading-none truncate">
                   AutoCommerce AI
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
                 </h3>
-                <span className="text-[10px] text-zinc-400 font-medium">Grounded in Live Store DB</span>
+                <span className="text-[10px] text-zinc-400 font-medium truncate block mt-0.5">Grounded in Live Store DB</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={() => setShowEmailInput(!showEmailInput)}
                 title="Toggle customer email input"
@@ -347,7 +346,7 @@ export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidg
 
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                title={isExpanded ? "Minimize" : "Expand"}
+                title={isExpanded ? "Standard Size" : "Expand Size"}
                 className="hidden sm:inline-flex p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
               >
                 {isExpanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
@@ -363,9 +362,9 @@ export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidg
             </div>
           </div>
 
-          {/* Optional Customer Email Drawer */}
+          {/* Optional Customer Email Drawer - Pinned */}
           {showEmailInput && (
-            <div className="px-3.5 py-2 bg-zinc-900/90 border-b border-zinc-800/80 flex items-center gap-2 animate-in fade-in duration-150">
+            <div className="shrink-0 px-3.5 py-2 bg-zinc-900/90 border-b border-zinc-800/80 flex items-center gap-2 animate-in fade-in duration-150">
               <Mail className="h-3.5 w-3.5 text-blue-400 shrink-0" />
               <input
                 type="email"
@@ -385,8 +384,8 @@ export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidg
             </div>
           )}
 
-          {/* Messages Body */}
-          <div className="flex-1 p-3.5 overflow-y-auto space-y-3 bg-zinc-950/60">
+          {/* Messages Body - Takes Remaining Space with Internal Scroll */}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3.5 space-y-3 bg-zinc-950/60">
             {messages.map((msg, idx) => (
               <ChatMessage key={idx} message={msg} onSelectAction={(act) => handleSendMessage(act)} />
             ))}
@@ -394,13 +393,13 @@ export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidg
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Prompts Suggestions */}
-          <div className="px-3 border-t border-zinc-800/60 bg-zinc-950/80">
+          {/* Quick Prompts Suggestions - Pinned */}
+          <div className="shrink-0 px-3 border-t border-zinc-800/60 bg-zinc-950/90">
             <QuickPrompts onSelectPrompt={(p) => handleSendMessage(p)} disabled={isLoading} />
           </div>
 
-          {/* Input Footer */}
-          <div className="p-3 border-t border-zinc-800/80 bg-zinc-900/60">
+          {/* Input Footer - Strictly Pinned at Bottom */}
+          <div className="shrink-0 sticky bottom-0 p-3 border-t border-zinc-800/80 bg-zinc-900/70 backdrop-blur-md">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -421,7 +420,7 @@ export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidg
                 size="sm"
                 type="submit"
                 disabled={!inputMessage.trim() || isLoading}
-                className="h-9 px-3.5"
+                className="h-9 px-3.5 shrink-0"
               >
                 <Send className="h-3.5 w-3.5" />
               </Button>

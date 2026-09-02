@@ -70,29 +70,29 @@ export function WebhookSimulator({ isOpen, onClose, onSuccess }: WebhookSimulato
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-950 p-6 shadow-2xl space-y-5">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-lg rounded-3xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl space-y-5">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <div className="p-2 rounded-xl gradient-blue-indigo text-white shadow-sm">
               <Package className="h-5 w-5" />
             </div>
             <div>
               <h3 className="text-base font-bold text-white">E-Commerce Webhook Simulator</h3>
-              <p className="text-xs text-slate-400">Trigger simulated Shopify / WooCommerce events</p>
+              <p className="text-xs text-zinc-400">Trigger simulated Shopify / WooCommerce events</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-900 transition-colors"
+            className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-900 transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Tab Selection */}
-        <div className="grid grid-cols-2 gap-2 p-1 bg-slate-900/80 rounded-xl border border-slate-800">
+        <div className="grid grid-cols-2 gap-2 p-1 bg-zinc-900 rounded-xl border border-zinc-800">
           <button
             onClick={() => {
               setActiveTab("order");
@@ -101,7 +101,7 @@ export function WebhookSimulator({ isOpen, onClose, onSuccess }: WebhookSimulato
             className={`py-2 text-xs font-semibold rounded-lg transition-all ${
               activeTab === "order"
                 ? "bg-blue-600 text-white shadow"
-                : "text-slate-400 hover:text-slate-200"
+                : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
             📦 Order Created Webhook
@@ -114,7 +114,7 @@ export function WebhookSimulator({ isOpen, onClose, onSuccess }: WebhookSimulato
             className={`py-2 text-xs font-semibold rounded-lg transition-all ${
               activeTab === "inventory"
                 ? "bg-blue-600 text-white shadow"
-                : "text-slate-400 hover:text-slate-200"
+                : "text-zinc-400 hover:text-zinc-200"
             }`}
           >
             🔄 Inventory Stock Sync
@@ -125,52 +125,52 @@ export function WebhookSimulator({ isOpen, onClose, onSuccess }: WebhookSimulato
         {activeTab === "order" ? (
           <div className="space-y-3.5 text-xs">
             <div>
-              <label className="text-slate-400 font-medium block mb-1">Simulated Order Number</label>
+              <label className="text-zinc-300 font-semibold block mb-1">Simulated Order Number</label>
               <input
                 type="text"
                 value={orderNumber}
                 onChange={(e) => setOrderNumber(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-slate-400 font-medium block mb-1">Customer Name</label>
+                <label className="text-zinc-300 font-semibold block mb-1">Customer Name</label>
                 <input
                   type="text"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-blue-500"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
               <div>
-                <label className="text-slate-400 font-medium block mb-1">Customer Email</label>
+                <label className="text-zinc-300 font-semibold block mb-1">Customer Email</label>
                 <input
                   type="email"
                   value={customerEmail}
                   onChange={(e) => setCustomerEmail(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-blue-500"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
             <div>
-              <label className="text-slate-400 font-medium block mb-1">Carrier Service</label>
+              <label className="text-zinc-300 font-semibold block mb-1">Carrier Service</label>
               <input
                 type="text"
                 value={carrier}
                 onChange={(e) => setCarrier(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
         ) : (
           <div className="space-y-3.5 text-xs">
             <div>
-              <label className="text-slate-400 font-medium block mb-1">Product SKU</label>
+              <label className="text-zinc-300 font-semibold block mb-1">Product SKU</label>
               <select
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500 cursor-pointer"
               >
                 <option value="TSHIRT-WHT-001">Classic White T-Shirt (TSHIRT-WHT-001)</option>
                 <option value="JEANS-DNM-002">Slim Fit Denim Jeans (JEANS-DNM-002)</option>
@@ -181,22 +181,22 @@ export function WebhookSimulator({ isOpen, onClose, onSuccess }: WebhookSimulato
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-slate-400 font-medium block mb-1">Variant Size</label>
+                <label className="text-zinc-300 font-semibold block mb-1">Variant Size</label>
                 <input
                   type="text"
                   value={size}
                   onChange={(e) => setSize(e.target.value)}
                   placeholder="e.g. L or 32"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-blue-500"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
               <div>
-                <label className="text-slate-400 font-medium block mb-1">New Available Stock</label>
+                <label className="text-zinc-300 font-semibold block mb-1">New Available Stock</label>
                 <input
                   type="number"
                   value={availableStock}
                   onChange={(e) => setAvailableStock(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-blue-500"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
@@ -227,8 +227,8 @@ export function WebhookSimulator({ isOpen, onClose, onSuccess }: WebhookSimulato
         )}
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800/80">
-          <Button variant="outline" size="sm" onClick={onClose}>
+        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-zinc-800/80">
+          <Button variant="secondary" size="sm" onClick={onClose}>
             Close
           </Button>
           <Button
