@@ -49,9 +49,12 @@ app.add_middleware(
 # Include API v1 and API Routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(api_router, prefix="/api")
+app.include_router(api_router)
 
 
 @app.get("/", tags=["System"])
+@app.get("/api", tags=["System"])
+@app.get("/api/v1", tags=["System"])
 def root():
     """Root status endpoint."""
     return {
