@@ -56,7 +56,11 @@ app.include_router(api_router, prefix="/api")
 app.include_router(api_router)
 
 
-@app.get("/", tags=["System"])
+@app.get("/")
+def root_home():
+    return {"status": "ok", "service": "Autonomous E-Commerce AI Agent API"}
+
+
 @app.get("/api", tags=["System"])
 @app.get("/api/v1", tags=["System"])
 def root():
