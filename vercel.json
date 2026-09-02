@@ -1,7 +1,27 @@
 {
   "rewrites": [
     {
-      "source": "/(api|health|docs|openapi.json)(.*)",
+      "source": "/api/(.*)",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/chat/(.*)",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/whatsapp/(.*)",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/docs",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/openapi.json",
       "destination": "/api/index.py"
     }
   ]
