@@ -12,6 +12,7 @@ root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
+from fastapi import Request
 from app.main import app
 from app.core.database import ensure_db_initialized, create_db_and_tables
 
@@ -87,6 +88,18 @@ app.add_middleware(VercelPathMiddleware)
 @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
 def root():
     return {"status": "ok", "service": "Autonomous E-Commerce AI Agent API"}
+
+
+# Debug catch-all route at the bottom to inspect unmatched requests on Vercel
+@app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+async def catch_all(request: Request, full_path: str):
+    return {
+        "error": "Route not matched by specific handlers",
+        "received_full_path": full_path,
+        "scope_path": request.scope.get("path"),
+        "raw_path": request.scope.get("raw_path", b"").decode("utf-8", errors="ignore"),
+        "headers": dict(request.headers),
+    }
 
 
 # Support Mangum or standard ASGI callable handler
