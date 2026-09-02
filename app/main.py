@@ -4,13 +4,17 @@ Includes CORS Middleware, Lifespan Database Initialization, and API Routers.
 """
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.database import Base, engine
+from app.core.database import Base, engine, get_db
 from app.api.v1.api import api_router
+from app.api.v1.endpoints.admin import list_products
+from app.api.v1.endpoints.chat import send_chat_message
+from app.schemas.chat import ChatRequest, ChatResponse
 
 
 @asynccontextmanager
@@ -58,13 +62,7 @@ app.include_router(api_router)
 @app.get("/api/v1", tags=["System"])
 def root():
     """Root status endpoint."""
-    return {
-        "service": settings.PROJECT_NAME,
-        "version": settings.VERSION,
-        "status": "operational",
-        "docs_url": "/docs",
-        "api_v1_prefix": settings.API_V1_STR,
-    }
+    return {"status": "ok", "service": "Autonomous E-Commerce AI Agent API"}
 
 
 @app.get("/health", tags=["System"])
@@ -78,6 +76,28 @@ def health_check():
         "version": settings.VERSION,
         "operational": True,
     }
+
+
+@app.get("/products", tags=["Catalog"])
+@app.get("/api/products", tags=["Catalog"])
+@app.get("/api/v1/products", tags=["Catalog"])
+def get_products_catalog(db: Session = Depends(get_db)):
+    """List all products (alias for /admin/products)."""
+    return list_products(db)
+
+
+@app.post("/chat/turn", response_model=ChatResponse, tags=["Chat & Agent"])
+@app.post("/api/chat/turn", response_model=ChatResponse, tags=["Chat & Agent"])
+@app.post("/api/v1/chat/turn", response_model=ChatResponse, tags=["Chat & Agent"])
+def chat_turn(payload: ChatRequest, db: Session = Depends(get_db)):
+    """Execute an autonomous agent conversation turn (alias for /chat)."""
+    return send_chat_message(payload, db)
+
+
+@app.get("/api/docs", include_in_schema=False)
+def api_docs_redirect():
+    """Redirect /api/docs to /docs."""
+    return RedirectResponse(url="/docs")
 
 
 @app.exception_handler(Exception)

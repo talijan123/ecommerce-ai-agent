@@ -29,7 +29,7 @@ def test_system_endpoints():
     print("🔹 Testing System Endpoints (Root & Health)...")
     res_root = client.get("/")
     assert res_root.status_code == 200
-    assert res_root.json()["status"] == "operational"
+    assert res_root.json()["status"] in ("operational", "ok")
 
     res_health = client.get("/health")
     assert res_health.status_code == 200

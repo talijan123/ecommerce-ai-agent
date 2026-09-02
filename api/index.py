@@ -10,5 +10,5 @@ from app.main import app
 
 
 @app.get("/")
-def root_check():
-    return {"status": "ok", "service": "FastAPI Backend"}
+def root():
+    return {"status": "ok", "service": "Autonomous E-Commerce AI Agent API"}
