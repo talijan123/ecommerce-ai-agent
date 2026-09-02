@@ -13,3 +13,5 @@ __pycache__/
 .env.local
 frontend/.env.local
 .env.*
+!.env.example
+!frontend/.env.example

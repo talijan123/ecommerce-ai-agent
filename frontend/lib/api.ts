@@ -2,11 +2,21 @@
  * Typed API Client for FastAPI Autonomous E-Commerce Backend.
  */
 
+// Strictly read NEXT_PUBLIC_API_URL, with fallback to NEXT_PUBLIC_API_BASE_URL
 const rawBaseUrl =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   "";
-const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "");
+
+export const API_BASE_URL = (rawBaseUrl || "").trim().replace(/\/+$/, "");
+
+if (!API_BASE_URL) {
+  console.warn(
+    "⚠️ [AutoCommerce API Client] NEXT_PUBLIC_API_URL is empty or not configured!\n" +
+    "API requests will fall back to relative paths (e.g. '/api/v1/...'), which will result in 404 Not Found errors on Vercel.\n" +
+    "Please set NEXT_PUBLIC_API_URL in your environment variables (e.g. https://your-backend.railway.app or http://localhost:8000)."
+  );
+}
 
 export interface ToolInvocationLog {
   tool_name: string;

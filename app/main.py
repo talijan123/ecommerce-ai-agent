@@ -40,11 +40,10 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS Middleware Configuration
+# CORS Middleware Configuration - Allow all origins for seamless cross-origin requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_origin_regex=r"^https://.*\.vercel\.app$",
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
