@@ -24,11 +24,13 @@ import {
   Zap,
   HelpCircle,
   ExternalLink,
+  Star,
 } from "lucide-react";
 import { Button, Card, Badge } from "@/lib/ui";
 import { api, Product } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { getProductImage } from "@/lib/productImages";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 interface CartItem {
   productId: number;
@@ -103,16 +105,14 @@ export default function StorefrontPage() {
         if (inStockOnly && product.stock_quantity <= 0) {
           return false;
         }
-        // Search query filter
-        if (searchQuery.trim()) {
+        // Search query filter (title, sku, category, description)
+        if (searchQuery.trim() !== "") {
           const q = searchQuery.toLowerCase();
-          const matchTitle = product.title.toLowerCase().includes(q);
-          const matchSku = product.sku.toLowerCase().includes(q);
-          const matchCategory = product.category.toLowerCase().includes(q);
-          const matchDesc = (product.description || "").toLowerCase().includes(q);
-          if (!matchTitle && !matchSku && !matchCategory && !matchDesc) {
-            return false;
-          }
+          const matchTitle = product.title?.toLowerCase().includes(q);
+          const matchSku = product.sku?.toLowerCase().includes(q);
+          const matchCat = product.category?.toLowerCase().includes(q);
+          const matchDesc = product.description?.toLowerCase().includes(q);
+          if (!matchTitle && !matchSku && !matchCat && !matchDesc) return false;
         }
         return true;
       })
@@ -123,42 +123,59 @@ export default function StorefrontPage() {
       });
   }, [products, selectedCategory, inStockOnly, searchQuery, sortBy]);
 
-  // Cart operations
+  // Total items and price in cart
+  const totalCartCount = useMemo(
+    () => cart.reduce((sum, item) => sum + item.quantity, 0),
+    [cart]
+  );
+  const totalCartPrice = useMemo(
+    () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [cart]
+  );
+
+  // Add to cart handler
   const handleAddToCart = (product: Product) => {
-    const size = selectedSizes[product.id] || product.size_variants?.[0]?.size || "Standard";
-    const image = getProductImage(product.sku, product.category, product.title, product.image_url);
+    const size =
+      selectedSizes[product.id] ||
+      product.size_variants?.[0]?.size ||
+      "Standard";
+    const imageUrl = getProductImage(product.sku, product.category, product.title, product.image_url);
 
     setCart((prev) => {
-      const existing = prev.find((item) => item.productId === product.id && item.size === size);
-      if (existing) {
-        return prev.map((item) =>
-          item.productId === product.id && item.size === size
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
+      const existingIdx = prev.findIndex(
+        (i) => i.productId === product.id && i.size === size
+      );
+      if (existingIdx > -1) {
+        const updated = [...prev];
+        updated[existingIdx].quantity += 1;
+        return updated;
+      } else {
+        return [
+          ...prev,
+          {
+            productId: product.id,
+            sku: product.sku,
+            title: product.title,
+            price: product.price,
+            size: size,
+            quantity: 1,
+            image: imageUrl,
+          },
+        ];
       }
-      return [
-        ...prev,
-        {
-          productId: product.id,
-          sku: product.sku,
-          title: product.title,
-          price: product.price,
-          size,
-          quantity: 1,
-          image,
-        },
-      ];
     });
 
-    // Micro feedback animation
+    // Trigger visual check animation
     setAddedItemAnim(product.id);
-    setTimeout(() => setAddedItemAnim(null), 1500);
+    setTimeout(() => {
+      setAddedItemAnim(null);
+    }, 1200);
   };
 
+  // Modify cart quantity
   const updateCartQuantity = (productId: number, size: string, delta: number) => {
-    setCart((prev) =>
-      prev
+    setCart((prev) => {
+      return prev
         .map((item) => {
           if (item.productId === productId && item.size === size) {
             const newQty = item.quantity + delta;
@@ -166,49 +183,57 @@ export default function StorefrontPage() {
           }
           return item;
         })
-        .filter(Boolean) as CartItem[]
-    );
+        .filter(Boolean) as CartItem[];
+    });
   };
 
+  // Remove from cart
   const removeCartItem = (productId: number, size: string) => {
-    setCart((prev) => prev.filter((item) => !(item.productId === productId && item.size === size)));
+    setCart((prev) =>
+      prev.filter((item) => !(item.productId === productId && item.size === size))
+    );
   };
 
-  const totalCartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
-  const totalCartPrice = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
-
-  // Trigger AI Chat helper from any UI button
-  const triggerAiChat = (prompt: string, email?: string) => {
-    window.dispatchEvent(
-      new CustomEvent("open-ai-chat", {
-        detail: { prompt, email },
-      })
-    );
+  // Trigger global AI chat widget event
+  const triggerAiChat = (promptText: string, email?: string) => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("open-ai-chat", {
+          detail: { prompt: promptText, email: email },
+        })
+      );
+    }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col antialiased selection:bg-blue-600 selection:text-white">
-      {/* Top Navbar */}
-      <header className="border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-2xl sticky top-0 z-40 transition-all">
+    <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col selection:bg-blue-600 selection:text-white transition-colors duration-200">
+      {/* Top Announcement Bar */}
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 text-white text-[11px] font-semibold py-1.5 px-4 text-center tracking-wide flex items-center justify-center gap-2">
+        <Sparkles className="h-3.5 w-3.5 animate-pulse" />
+        <span>Live Autonomous E-Commerce PoC • Powered by OpenAI Function Calling & 100+ Live Products</span>
+      </div>
+
+      {/* Main Navigation Header */}
+      <header className="sticky top-0 z-40 w-full border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          {/* Brand Logo & Online Status */}
+          {/* Brand Logo & Live Badge */}
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="h-9 w-9 rounded-xl gradient-blue-indigo flex items-center justify-center text-white shadow-md shadow-indigo-500/25 group-hover:scale-105 transition-transform duration-200">
+              <div className="h-9 w-9 rounded-2xl gradient-blue-indigo flex items-center justify-center text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
                 <Bot className="h-5 w-5" />
               </div>
               <div className="flex flex-col">
-                <span className="font-extrabold text-base tracking-tight text-white group-hover:text-blue-400 transition-colors">
+                <span className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                   AutoCommerce
                 </span>
-                <span className="text-[10px] text-zinc-400 font-mono tracking-wider uppercase -mt-0.5">
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono tracking-wider uppercase -mt-0.5">
                   Autonomous AI Agent
                 </span>
               </div>
             </Link>
 
             {/* Live AI Status Badge */}
-            <div className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold tracking-tight">
+            <div className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold tracking-tight">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -224,27 +249,30 @@ export default function StorefrontPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search catalog by title, SKU, or keyword..."
-              className="w-full bg-zinc-900/90 border border-zinc-800/90 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-blue-500/70 focus:ring-1 focus:ring-blue-500/30 transition-all"
+              placeholder="Search 100+ real products, categories, or SKUs..."
+              className="w-full bg-zinc-100/90 dark:bg-zinc-900/90 border border-zinc-200/90 dark:border-zinc-800/90 rounded-xl pl-9 pr-8 py-2 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-white"
+                className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
 
-          {/* Right Action Icons: Cart & Dashboard */}
-          <div className="flex items-center gap-2.5">
+          {/* Right Action Icons: Theme Toggle, Cart & Dashboard */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* Theme Toggle Button */}
+            <ThemeToggle showDropdown={false} />
+
             {/* Cart Button with Count Badge */}
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white hover:border-zinc-700 hover:bg-zinc-800/80 transition-all active:scale-95 flex items-center gap-2 text-xs font-semibold px-3"
+              className="relative p-2 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-200 hover:text-blue-600 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-200/70 dark:hover:bg-zinc-800/80 transition-all active:scale-95 flex items-center gap-2 text-xs font-semibold px-3"
             >
-              <ShoppingBag className="h-4 w-4 text-blue-400" />
+              <ShoppingBag className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               <span className="hidden sm:inline">Cart</span>
               {totalCartCount > 0 && (
                 <span className="h-5 min-w-[20px] px-1 rounded-full gradient-blue-indigo text-white text-[10px] font-bold flex items-center justify-center animate-in zoom-in-50">
@@ -256,7 +284,7 @@ export default function StorefrontPage() {
             {/* Merchant Dashboard Link */}
             <Link href="/dashboard">
               <Button variant="secondary" size="sm" className="gap-2">
-                <LayoutDashboard className="h-3.5 w-3.5 text-indigo-400" />
+                <LayoutDashboard className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
                 <span className="hidden sm:inline">Admin Dashboard</span>
                 <span className="sm:hidden">Admin</span>
               </Button>
@@ -266,47 +294,47 @@ export default function StorefrontPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden py-14 sm:py-20 px-4 sm:px-6 border-b border-zinc-800/80 bg-grid-pattern">
+      <section className="relative overflow-hidden py-14 sm:py-20 px-4 sm:px-6 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-grid-pattern">
         {/* Subtle Radial Glow in Center */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-4xl mx-auto text-center space-y-6 relative z-10">
           <Badge variant="indigo" className="px-3.5 py-1 text-xs gap-1.5 shadow-sm">
-            <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+            <Sparkles className="h-3.5 w-3.5 text-indigo-500 dark:text-indigo-400" />
             Autonomous Tool-Calling PoC • OpenAI Function Calling Grounded
           </Badge>
 
-          <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-tight sm:leading-none text-white">
+          <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-tight sm:leading-none text-zinc-900 dark:text-white">
             Next-Gen E-Commerce with <br className="hidden sm:block" />
             <span className="gradient-text">Autonomous AI Agents</span>
           </h1>
 
-          <p className="text-sm sm:text-base text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            Experience an intelligent store assistant connected directly to live SQLite/Supabase inventory, real-time carrier tracking APIs, and cart recovery systems.
+          <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
+            Experience an intelligent store assistant connected directly to live Supabase PostgreSQL inventory, real-time carrier tracking APIs, and cart recovery systems.
           </p>
 
           {/* Interactive Test Prompts Bar */}
           <div className="pt-2">
-            <span className="text-[11px] font-semibold text-zinc-400 block mb-2 uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 block mb-2 uppercase tracking-wider">
               Click to Test Live AI Capabilities:
             </span>
             <div className="flex flex-wrap justify-center gap-2 max-w-3xl mx-auto">
               <button
                 onClick={() => triggerAiChat("Where is my order #1042?")}
-                className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-300 hover:border-blue-500/50 hover:bg-zinc-800 hover:text-white transition-all active:scale-95 shadow-sm"
+                className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 hover:border-blue-500/50 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all active:scale-95 shadow-sm"
               >
-                <CheckCircle2 className="h-3.5 w-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 group-hover:scale-110 transition-transform" />
                 <span>"Where is order #1042?"</span>
-                <span className="text-[10px] text-zinc-500 font-mono">Live Tracking</span>
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Live Tracking</span>
               </button>
 
               <button
-                onClick={() => triggerAiChat("Do you have the Classic White T-Shirt in size L?")}
-                className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-300 hover:border-amber-500/50 hover:bg-zinc-800 hover:text-white transition-all active:scale-95 shadow-sm"
+                onClick={() => triggerAiChat("Do you have the Essence Mascara Lash Princess in size 30ml?")}
+                className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 hover:border-amber-500/50 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all active:scale-95 shadow-sm"
               >
-                <TrendingUp className="h-3.5 w-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
-                <span>"Size L in White T-Shirt?"</span>
-                <span className="text-[10px] text-zinc-500 font-mono">Stock Intelligence</span>
+                <TrendingUp className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400 group-hover:scale-110 transition-transform" />
+                <span>"Mascara stock check?"</span>
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Stock Intelligence</span>
               </button>
 
               <button
@@ -316,20 +344,20 @@ export default function StorefrontPage() {
                     "sarah.smith@example.com"
                   )
                 }
-                className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-300 hover:border-emerald-500/50 hover:bg-zinc-800 hover:text-white transition-all active:scale-95 shadow-sm"
+                className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 hover:border-emerald-500/50 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all active:scale-95 shadow-sm"
               >
-                <Tag className="h-3.5 w-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                <Tag className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
                 <span>"Cart promo for Sarah"</span>
-                <span className="text-[10px] text-zinc-500 font-mono">Cart Recovery</span>
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Cart Recovery</span>
               </button>
 
               <button
                 onClick={() => triggerAiChat("Mera order #1043 kab tak deliver hoga?")}
-                className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-300 hover:border-purple-500/50 hover:bg-zinc-800 hover:text-white transition-all active:scale-95 shadow-sm"
+                className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 hover:border-purple-500/50 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all active:scale-95 shadow-sm"
               >
-                <Zap className="h-3.5 w-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
+                <Zap className="h-3.5 w-3.5 text-purple-500 dark:text-purple-400 group-hover:scale-110 transition-transform" />
                 <span>"Mera order #1043?"</span>
-                <span className="text-[10px] text-zinc-500 font-mono">Roman Urdu</span>
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Roman Urdu</span>
               </button>
             </div>
           </div>
@@ -347,13 +375,13 @@ export default function StorefrontPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search products, SKUs..."
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-blue-500"
+              placeholder="Search 100+ real products, SKUs..."
+              className="w-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-9 pr-8 py-2 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-blue-500"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-2.5 text-zinc-400"
+                className="absolute right-2.5 top-2.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -377,13 +405,15 @@ export default function StorefrontPage() {
                     className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
                       isActive
                         ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
-                        : "bg-zinc-900 border border-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+                        : "bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-200/70 dark:hover:bg-zinc-800"
                     }`}
                   >
                     <span>{cat}</span>
                     <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                        isActive ? "bg-white/20 text-white" : "bg-zinc-800 text-zinc-400"
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                        isActive
+                          ? "bg-blue-700 text-white"
+                          : "bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
                       }`}
                     >
                       {count}
@@ -393,49 +423,46 @@ export default function StorefrontPage() {
               })}
             </div>
 
-            {/* Filter Switches & Sort Dropdown */}
-            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-              {/* In Stock Only Toggle */}
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-zinc-300 select-none">
+            {/* Filter Switches & Sort By Dropdown */}
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end shrink-0">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-zinc-700 dark:text-zinc-300 select-none">
                 <input
                   type="checkbox"
                   checked={inStockOnly}
                   onChange={(e) => setInStockOnly(e.target.checked)}
-                  className="rounded bg-zinc-900 border-zinc-700 text-blue-600 focus:ring-0 focus:ring-offset-0 h-4 w-4"
+                  className="rounded border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-900 text-blue-600 focus:ring-blue-500 h-4 w-4"
                 />
                 <span>In-Stock Only</span>
               </label>
 
-              {/* Sort selector */}
-              <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs text-zinc-300">
+              <div className="flex items-center gap-1.5">
                 <SlidersHorizontal className="h-3.5 w-3.5 text-zinc-400" />
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="bg-transparent border-none text-zinc-200 text-xs focus:outline-none cursor-pointer pr-1"
+                  className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-blue-500"
                 >
-                  <option value="featured" className="bg-zinc-900 text-zinc-200">Featured</option>
-                  <option value="price-asc" className="bg-zinc-900 text-zinc-200">Price: Low to High</option>
-                  <option value="price-desc" className="bg-zinc-900 text-zinc-200">Price: High to Low</option>
+                  <option value="featured">Featured Catalog</option>
+                  <option value="price-asc">Price: Low to High</option>
+                  <option value="price-desc">Price: High to Low</option>
                 </select>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Loading Skeletons */}
+        {/* Loading Skeleton */}
         {loading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
-                className="h-96 rounded-3xl bg-zinc-900/40 border border-zinc-800/60 p-5 space-y-4 shimmer-mask"
+                className="rounded-3xl border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50 dark:bg-zinc-900/40 p-5 space-y-4 animate-pulse"
               >
-                <div className="h-44 rounded-2xl bg-zinc-800/50" />
-                <div className="h-4 w-1/3 bg-zinc-800/50 rounded" />
-                <div className="h-6 w-3/4 bg-zinc-800/50 rounded" />
-                <div className="h-4 w-full bg-zinc-800/30 rounded" />
-                <div className="h-10 w-full bg-zinc-800/50 rounded-xl mt-4" />
+                <div className="h-48 rounded-2xl bg-zinc-200 dark:bg-zinc-800" />
+                <div className="h-4 w-3/4 rounded bg-zinc-200 dark:bg-zinc-800" />
+                <div className="h-3 w-1/2 rounded bg-zinc-200 dark:bg-zinc-800" />
+                <div className="h-8 rounded bg-zinc-200 dark:bg-zinc-800" />
               </div>
             ))}
           </div>
@@ -443,12 +470,10 @@ export default function StorefrontPage() {
 
         {/* Empty Search / Filter State */}
         {!loading && filteredProducts.length === 0 && (
-          <div className="text-center py-16 px-4 rounded-3xl border border-zinc-800/80 bg-zinc-900/40 backdrop-blur-xl max-w-lg mx-auto space-y-4">
-            <div className="h-12 w-12 rounded-2xl bg-zinc-800/80 flex items-center justify-center mx-auto text-zinc-400">
-              <PackageSearch className="h-6 w-6" />
-            </div>
-            <h3 className="text-base font-bold text-white">No products found</h3>
-            <p className="text-xs text-zinc-400 max-w-sm mx-auto leading-relaxed">
+          <div className="text-center py-20 border border-dashed border-zinc-300 dark:border-zinc-800 rounded-3xl p-8 space-y-4 bg-zinc-50/50 dark:bg-zinc-900/20">
+            <PackageSearch className="h-12 w-12 text-zinc-400 dark:text-zinc-600 mx-auto" />
+            <h3 className="text-base font-bold text-zinc-900 dark:text-white">No products found</h3>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
               We couldn't find any products matching "{searchQuery}" with the current active filters.
             </p>
             <Button
@@ -487,14 +512,14 @@ export default function StorefrontPage() {
               return (
                 <div
                   key={product.id}
-                  className="group rounded-3xl border border-zinc-800/80 bg-zinc-900/60 hover:bg-zinc-900/90 p-5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-indigo-500/10 hover:border-zinc-700/80 flex flex-col justify-between"
+                  className="group rounded-3xl border border-zinc-200/90 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/60 hover:bg-white dark:hover:bg-zinc-900/90 p-5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1.5 shadow-md dark:shadow-none hover:shadow-2xl hover:shadow-indigo-500/10 hover:border-blue-500/30 dark:hover:border-zinc-700/80 flex flex-col justify-between"
                 >
                   <div className="space-y-4">
                     {/* Image Wrapper with Shimmer Skeleton */}
-                    <div className="relative h-48 sm:h-52 w-full rounded-2xl overflow-hidden bg-zinc-950 border border-zinc-800/60">
+                    <div className="relative h-48 sm:h-52 w-full rounded-2xl overflow-hidden bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800/60">
                       {!isImageLoaded && (
-                        <div className="absolute inset-0 bg-zinc-900 shimmer-mask flex items-center justify-center">
-                          <Bot className="h-8 w-8 text-zinc-700" />
+                        <div className="absolute inset-0 bg-zinc-100 dark:bg-zinc-900 shimmer-mask flex items-center justify-center">
+                          <Bot className="h-8 w-8 text-zinc-400 dark:text-zinc-700" />
                         </div>
                       )}
                       <img
@@ -510,10 +535,10 @@ export default function StorefrontPage() {
 
                       {/* Top Badges Overlay */}
                       <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
-                        <Badge variant="secondary" className="backdrop-blur-md bg-zinc-950/80 text-[10px]">
+                        <Badge variant="secondary" className="backdrop-blur-md bg-white/90 dark:bg-zinc-950/80 text-[10px]">
                           {product.category}
                         </Badge>
-                        <span className="font-mono text-[10px] text-zinc-300 font-semibold px-2 py-0.5 rounded-md bg-zinc-950/80 backdrop-blur-md border border-zinc-800">
+                        <span className="font-mono text-[10px] text-zinc-700 dark:text-zinc-300 font-semibold px-2 py-0.5 rounded-md bg-white/90 dark:bg-zinc-950/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 shadow-sm">
                           {product.sku}
                         </span>
                       </div>
@@ -521,10 +546,18 @@ export default function StorefrontPage() {
 
                     {/* Product Details Header */}
                     <div className="space-y-1">
-                      <h3 className="text-base font-bold text-white group-hover:text-blue-400 transition-colors line-clamp-1">
-                        {product.title}
-                      </h3>
-                      <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-base font-bold text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1">
+                          {product.title}
+                        </h3>
+                        {product.rating ? (
+                          <div className="flex items-center gap-1 text-xs font-bold text-amber-500 shrink-0">
+                            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                            <span>{product.rating.toFixed(1)}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-2 leading-relaxed">
                         {product.description || "Premium quality e-commerce product."}
                       </p>
                     </div>
@@ -532,15 +565,15 @@ export default function StorefrontPage() {
                     {/* Interactive Size Variant Selector Chips */}
                     {product.size_variants && product.size_variants.length > 0 && (
                       <div className="space-y-1.5 pt-1">
-                        <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                        <div className="flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
                           <span>Select Size:</span>
-                          <span className="font-medium text-zinc-300">
+                          <span className="font-medium text-zinc-700 dark:text-zinc-300">
                             {variantStock > 0 ? (
-                              <span className="text-emerald-400 font-semibold">
+                              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                                 {variantStock} in stock
                               </span>
                             ) : (
-                              <span className="text-rose-400 font-semibold">
+                              <span className="text-rose-600 dark:text-rose-400 font-semibold">
                                 Out of stock!
                               </span>
                             )}
@@ -564,8 +597,8 @@ export default function StorefrontPage() {
                                   isSelected
                                     ? "bg-blue-600 border-blue-500 text-white shadow-sm shadow-blue-500/30"
                                     : isVOutOfStock
-                                    ? "bg-rose-500/10 border-rose-500/20 text-rose-400 line-through opacity-80"
-                                    : "bg-zinc-800/80 border-zinc-700/80 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+                                    ? "bg-rose-500/10 border-rose-500/20 text-rose-500 dark:text-rose-400 line-through opacity-80"
+                                    : "bg-zinc-100 dark:bg-zinc-800/80 border-zinc-200 dark:border-zinc-700/80 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white"
                                 }`}
                                 title={
                                   isVOutOfStock
@@ -583,10 +616,10 @@ export default function StorefrontPage() {
                   </div>
 
                   {/* Card Footer: Price, Add to Cart & Ask AI Trigger */}
-                  <div className="mt-5 pt-4 border-t border-zinc-800/80 space-y-3">
+                  <div className="mt-5 pt-4 border-t border-zinc-200 dark:border-zinc-800/80 space-y-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-xl font-black text-white tracking-tight">
+                        <span className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">
                           {formatCurrency(product.price)}
                         </span>
                       </div>
@@ -596,15 +629,17 @@ export default function StorefrontPage() {
                         <span
                           className={`h-2 w-2 rounded-full ${
                             product.stock_quantity > 5
-                              ? "bg-emerald-400"
+                              ? "bg-emerald-500 dark:bg-emerald-400"
                               : product.stock_quantity > 0
-                              ? "bg-amber-400"
-                              : "bg-rose-400"
+                              ? "bg-amber-500 dark:bg-amber-400"
+                              : "bg-rose-500 dark:bg-rose-400"
                           }`}
                         />
                         <span
                           className={
-                            product.stock_quantity > 0 ? "text-zinc-300" : "text-rose-400"
+                            product.stock_quantity > 0
+                              ? "text-zinc-600 dark:text-zinc-300"
+                              : "text-rose-600 dark:text-rose-400"
                           }
                         >
                           {product.stock_quantity > 0
@@ -622,7 +657,7 @@ export default function StorefrontPage() {
                         disabled={isOutOfStock}
                         onClick={() => handleAddToCart(product)}
                         className={`w-full gap-1.5 text-xs font-semibold ${
-                          addedItemAnim === product.id ? "bg-emerald-600 border-emerald-500" : ""
+                          addedItemAnim === product.id ? "bg-emerald-600 border-emerald-500 text-white" : ""
                         }`}
                       >
                         {addedItemAnim === product.id ? (
@@ -651,7 +686,7 @@ export default function StorefrontPage() {
                         }
                         className="w-full gap-1 text-[11px]"
                       >
-                        <Sparkles className="h-3 w-3 text-blue-400" />
+                        <Sparkles className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                         Ask AI
                       </Button>
                     </div>
@@ -672,22 +707,22 @@ export default function StorefrontPage() {
           />
 
           <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-            <div className="w-screen max-w-md bg-zinc-950 border-l border-zinc-800 shadow-2xl flex flex-col">
+            <div className="w-screen max-w-md bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col text-zinc-900 dark:text-white">
               {/* Cart Header */}
-              <div className="p-5 border-b border-zinc-800/80 bg-zinc-900/60 flex items-center justify-between">
+              <div className="p-5 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/80 dark:bg-zinc-900/60 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="h-8 w-8 rounded-xl gradient-blue-indigo flex items-center justify-center text-white shadow-md">
                     <ShoppingBag className="h-4 w-4" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-white">Your Shopping Cart</h2>
-                    <span className="text-[11px] text-zinc-400">{totalCartCount} items selected</span>
+                    <h2 className="text-sm font-bold text-zinc-900 dark:text-white">Your Shopping Cart</h2>
+                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400">{totalCartCount} items selected</span>
                   </div>
                 </div>
 
                 <button
                   onClick={() => setIsCartOpen(false)}
-                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -697,8 +732,8 @@ export default function StorefrontPage() {
               <div className="flex-1 p-5 overflow-y-auto space-y-4">
                 {cart.length === 0 ? (
                   <div className="text-center py-16 space-y-3">
-                    <ShoppingBag className="h-12 w-12 text-zinc-600 mx-auto" />
-                    <p className="text-sm font-medium text-zinc-400">Your cart is currently empty.</p>
+                    <ShoppingBag className="h-12 w-12 text-zinc-400 dark:text-zinc-600 mx-auto" />
+                    <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Your cart is currently empty.</p>
                     <Button variant="outline" size="sm" onClick={() => setIsCartOpen(false)}>
                       Explore Catalog
                     </Button>
@@ -707,20 +742,20 @@ export default function StorefrontPage() {
                   cart.map((item, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center gap-3 p-3 rounded-2xl border border-zinc-800/80 bg-zinc-900/40"
+                      className="flex items-center gap-3 p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800/80 bg-zinc-50 dark:bg-zinc-900/40 shadow-sm"
                     >
                       <img
                         src={item.image}
                         alt={item.title}
-                        className="h-16 w-16 rounded-xl object-cover border border-zinc-800"
+                        className="h-16 w-16 rounded-xl object-cover border border-zinc-200 dark:border-zinc-800"
                       />
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-xs font-bold text-white truncate">{item.title}</h4>
+                        <h4 className="text-xs font-bold text-zinc-900 dark:text-white truncate">{item.title}</h4>
                         <div className="flex items-center gap-2 mt-0.5">
                           <Badge variant="outline" className="text-[10px] py-0">
                             Size {item.size}
                           </Badge>
-                          <span className="text-xs font-bold text-white">
+                          <span className="text-xs font-bold text-zinc-900 dark:text-white">
                             {formatCurrency(item.price)}
                           </span>
                         </div>
@@ -729,16 +764,16 @@ export default function StorefrontPage() {
                         <div className="flex items-center gap-2 mt-2">
                           <button
                             onClick={() => updateCartQuantity(item.productId, item.size, -1)}
-                            className="p-1 rounded-md bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                            className="p-1 rounded-md bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-300 dark:hover:bg-zinc-700"
                           >
                             <Minus className="h-3 w-3" />
                           </button>
-                          <span className="text-xs font-bold text-zinc-200 px-1 font-mono">
+                          <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 px-1 font-mono">
                             {item.quantity}
                           </span>
                           <button
                             onClick={() => updateCartQuantity(item.productId, item.size, 1)}
-                            className="p-1 rounded-md bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700"
+                            className="p-1 rounded-md bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-300 dark:hover:bg-zinc-700"
                           >
                             <Plus className="h-3 w-3" />
                           </button>
@@ -747,7 +782,7 @@ export default function StorefrontPage() {
 
                       <button
                         onClick={() => removeCartItem(item.productId, item.size)}
-                        className="p-1.5 text-zinc-500 hover:text-rose-400 transition-colors"
+                        className="p-1.5 text-zinc-400 hover:text-rose-500 transition-colors"
                         title="Remove item"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -759,10 +794,10 @@ export default function StorefrontPage() {
 
               {/* Cart Footer */}
               {cart.length > 0 && (
-                <div className="p-5 border-t border-zinc-800/80 bg-zinc-900/60 space-y-3">
+                <div className="p-5 border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50/80 dark:bg-zinc-900/60 space-y-3">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-400">Subtotal:</span>
-                    <span className="text-base font-black text-white">{formatCurrency(totalCartPrice)}</span>
+                    <span className="text-zinc-500 dark:text-zinc-400">Subtotal:</span>
+                    <span className="text-base font-black text-zinc-900 dark:text-white">{formatCurrency(totalCartPrice)}</span>
                   </div>
 
                   {/* Ask AI for Discount Button */}
@@ -774,7 +809,7 @@ export default function StorefrontPage() {
                         "sarah.smith@example.com"
                       );
                     }}
-                    className="w-full py-2 px-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+                    className="w-full py-2 px-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
                   >
                     <Tag className="h-3.5 w-3.5" />
                     Ask AI Agent for a Cart Discount
@@ -798,14 +833,14 @@ export default function StorefrontPage() {
       )}
 
       {/* Footer */}
-      <footer className="border-t border-zinc-800/80 bg-zinc-950 py-8 px-6 text-center text-xs text-zinc-500">
+      <footer className="border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50 dark:bg-zinc-950 py-8 px-6 text-center text-xs text-zinc-500">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <p>AutoCommerce AI PoC • Next.js 14, TypeScript, Tailwind CSS, FastAPI, and OpenAI Tool Calling.</p>
-          <div className="flex items-center gap-4 text-zinc-400">
-            <Link href="/dashboard" className="hover:text-white transition-colors">
+          <div className="flex items-center gap-4 text-zinc-600 dark:text-zinc-400">
+            <Link href="/dashboard" className="hover:text-zinc-900 dark:hover:text-white transition-colors">
               Merchant Admin
             </Link>
-            <Link href="/widget" className="hover:text-white transition-colors">
+            <Link href="/widget" className="hover:text-zinc-900 dark:hover:text-white transition-colors">
               Embeddable Widget
             </Link>
           </div>
@@ -814,4 +849,3 @@ export default function StorefrontPage() {
     </div>
   );
 }
-

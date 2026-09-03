@@ -5,6 +5,7 @@ import { Bot, RefreshCw, Activity, Zap } from "lucide-react";
 import { Button } from "@/lib/ui";
 import { api } from "@/lib/api";
 import { Badge } from "@/lib/ui";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 interface HeaderProps {
   title: string;
@@ -27,13 +28,13 @@ export function Header({ title, description, onRefresh, onOpenSimulator }: Heade
   }, []);
 
   return (
-    <header className="h-18 sm:h-20 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-xl px-6 sm:px-8 flex items-center justify-between sticky top-0 z-30">
+    <header className="h-18 sm:h-20 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl px-6 sm:px-8 flex items-center justify-between sticky top-0 z-30 transition-colors">
       <div>
-        <h1 className="text-lg sm:text-xl font-black text-white tracking-tight">{title}</h1>
-        {description ? <p className="text-xs text-zinc-400 mt-0.5 max-w-xl">{description}</p> : null}
+        <h1 className="text-lg sm:text-xl font-black text-zinc-900 dark:text-white tracking-tight">{title}</h1>
+        {description ? <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 max-w-xl">{description}</p> : null}
       </div>
 
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2 sm:gap-2.5">
         {/* Backend Status Indicator */}
         <Badge
           variant={isBackendHealthy ? "success" : isBackendHealthy === false ? "destructive" : "secondary"}
@@ -47,6 +48,9 @@ export function Header({ title, description, onRefresh, onOpenSimulator }: Heade
             ? "API Operational"
             : "API Offline"}
         </Badge>
+
+        {/* Theme Toggle Button */}
+        <ThemeToggle showDropdown={false} />
 
         {onRefresh && (
           <Button variant="outline" size="sm" onClick={onRefresh} className="gap-1.5 text-xs">
