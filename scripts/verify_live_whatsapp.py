@@ -69,7 +69,7 @@ def verify_configuration():
     return True
 
 
-def verify_direct_outbound_dispatch(test_phone: str = "16505551234"):
+def verify_direct_outbound_dispatch(test_phone: str = "923187806306"):
     section("2. DIRECT OUTBOUND MESSAGE DISPATCH (send_text_message_sync)")
     
     print(f" • Target Recipient: {test_phone}")
@@ -136,7 +136,7 @@ def verify_cart_recovery_endpoint():
                 session_id=test_session_id,
                 customer_name="Talal Test",
                 customer_email="talal.test@example.com",
-                customer_phone="923001234567",
+                customer_phone="923187806306",
                 abandoned_items=[
                     {"product_id": 1, "name": "Minimalist Ceramic Lamp", "size": "Standard", "price": 85.0}
                 ],
@@ -147,11 +147,12 @@ def verify_cart_recovery_endpoint():
             )
             db.add(cart)
             db.commit()
-            print(f" • Seeded test CartSession: {test_session_id}")
+            print(f" • Seeded test CartSession: {test_session_id} with phone 923187806306")
         else:
+            cart.customer_phone = "923187806306"
             cart.recovery_sent = False
             db.commit()
-            print(f" • Reset test CartSession: {test_session_id}")
+            print(f" • Updated test CartSession: {test_session_id} with phone 923187806306 and reset recovery_sent=False")
     finally:
         db.close()
 

@@ -197,7 +197,7 @@ def seed_real_products():
                 session_id="sess_abc123",
                 customer_name="Sarah Smith",
                 customer_email="sarah.smith@example.com",
-                customer_phone="+14155552671",
+                customer_phone="923187806306",
                 abandoned_items=[
                     {"name": first_product.title, "size": first_product.size_variants[0]["size"], "price": first_product.price, "quantity": 1}
                 ],
@@ -211,7 +211,7 @@ def seed_real_products():
                 session_id="sess_xyz789",
                 customer_name="Ali Khan",
                 customer_email="ali.khan@example.com",
-                customer_phone="+923001234567",
+                customer_phone="923187806306",
                 abandoned_items=[
                     {"name": third_product.title, "size": third_product.size_variants[0]["size"], "price": third_product.price, "quantity": 1}
                 ],
