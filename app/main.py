@@ -4,6 +4,7 @@ Includes CORS Middleware, Lifespan Database Initialization, and API Routers.
 """
 
 from contextlib import asynccontextmanager
+from typing import List
 from fastapi import FastAPI, Request, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -21,7 +22,7 @@ from app.schemas.chat import ChatRequest, ChatResponse
 async def lifespan(app: FastAPI):
     """
     Application Lifespan:
-    - Runs on startup: Creates all database tables and seeds mock catalog if empty.
+    - Runs on startup: Creates all database tables and seeds catalog if empty.
     - Runs on shutdown: Cleanly cleans up resources.
     """
     try:
@@ -40,13 +41,28 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS Middleware Configuration - Allow all origins for seamless cross-origin requests
+# Explicitly Whitelisted Origins (Production Vercel + Local Development)
+ALLOWED_ORIGINS: List[str] = [
+    "https://ecommerce-store-frontend-swart.vercel.app",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+# Include additional origins from environment settings if provided
+for origin in settings.CORS_ORIGINS:
+    if origin and origin != "*" and origin not in ALLOWED_ORIGINS:
+        ALLOWED_ORIGINS.append(origin)
+
+# CORS Middleware Configuration with exact origin list & Vercel preview regex
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https://.*\.vercel\.app$",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=86400,
 )
 
 # Include API v1 and API Routers
@@ -104,10 +120,17 @@ def api_docs_redirect():
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Global unhandled exception safety net."""
+    """Global unhandled exception safety net ensuring JSON response with CORS."""
+    origin = request.headers.get("origin")
+    headers = {}
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"error": "InternalServerError", "message": str(exc)},
+        headers=headers,
     )
 
 
