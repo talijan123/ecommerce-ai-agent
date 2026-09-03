@@ -12,7 +12,7 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function formatDate(dateString?: string): string {
+export function formatDate(dateString?: string | null): string {
   if (!dateString) return "N/A";
   try {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -22,6 +22,6 @@ export function formatDate(dateString?: string): string {
       minute: "2-digit",
     });
   } catch {
-    return dateString;
+    return String(dateString);
   }
 }

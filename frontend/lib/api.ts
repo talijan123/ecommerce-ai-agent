@@ -1,27 +1,15 @@
 /**
- * Typed API Client for FastAPI Autonomous E-Commerce Backend.
+ * Frontend API Client for AutoCommerce Autonomous AI Agent Backend.
+ * Seamlessly connects to FastAPI running locally or on Render/Supabase.
  */
 
-// Strictly read NEXT_PUBLIC_API_URL, with fallback to NEXT_PUBLIC_API_BASE_URL
-const rawBaseUrl =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "";
-
-export const API_BASE_URL = (rawBaseUrl || "").trim().replace(/\/+$/, "");
-
-if (!API_BASE_URL) {
-  console.warn(
-    "⚠️ [AutoCommerce API Client] NEXT_PUBLIC_API_URL is empty or not configured!\n" +
-    "API requests will fall back to relative paths (e.g. '/api/v1/...'), which will result in 404 Not Found errors on Vercel.\n" +
-    "Please set NEXT_PUBLIC_API_URL in your environment variables (e.g. https://your-backend.railway.app or http://localhost:8000)."
-  );
-}
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+export const API_BASE_URL = RAW_API_URL.replace(/\/+$/, "");
 
 export interface ToolInvocationLog {
   tool_name: string;
   arguments: Record<string, any>;
-  result: any;
+  result: Record<string, any>;
 }
 
 export interface ChatResponse {
@@ -35,11 +23,11 @@ export interface ChatResponse {
 export interface ChatHistoryRecord {
   id: number;
   session_id: string;
-  role: "system" | "user" | "assistant" | "tool";
-  content?: string;
-  tool_calls?: any[];
-  tool_call_id?: string;
+  role: string;
+  content: string;
   name?: string;
+  tool_call_id?: string;
+  tool_calls?: any;
   created_at?: string;
 }
 
@@ -51,13 +39,15 @@ export interface DashboardStats {
   low_stock_alerts: number;
   total_cart_sessions: number;
   cart_recovery_rate_pct: number;
+  error?: string;
 }
 
 export interface ConversationSummary {
   session_id: string;
+  channel: string;
   message_count: number;
   preview: string;
-  last_active?: string;
+  last_active: string | null;
   tools_used: string[];
   status: string;
 }
@@ -72,7 +62,7 @@ export interface Product {
   sku: string;
   title: string;
   name?: string;
-  description?: string;
+  description: string;
   category: string;
   price: number;
   stock_quantity: number;
@@ -199,6 +189,19 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sku, available, size }),
+    });
+    return res.json();
+  },
+
+  // WhatsApp Abandoned Cart Recovery Trigger API
+  async triggerWhatsAppCartRecovery(sessionId?: string, includeAlreadySent: boolean = false) {
+    const params = new URLSearchParams();
+    if (sessionId) params.append("session_id", sessionId);
+    if (includeAlreadySent) params.append("include_already_sent", "true");
+    const queryStr = params.toString() ? `?${params.toString()}` : "";
+    const res = await fetch(`${API_BASE_URL}/api/v1/admin/recovery/trigger-whatsapp${queryStr}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
     });
     return res.json();
   },

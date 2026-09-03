@@ -9,7 +9,7 @@ import re
 import socket
 import urllib.parse
 from typing import Generator
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from app.core.config import settings
 
@@ -99,9 +99,21 @@ Base = declarative_base()
 
 
 def create_db_and_tables():
-    """Create all database tables on configured engine."""
+    """Create all database tables and add missing columns if needed."""
     import app.models  # noqa: F401
     Base.metadata.create_all(bind=engine)
+
+    # Automatic schema migration for new columns in CartSession
+    try:
+        with engine.begin() as conn:
+            if not db_url.startswith("sqlite"):
+                conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS customer_name VARCHAR(150) DEFAULT 'Valued Customer'"))
+                conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(50)"))
+                conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS recovery_sent BOOLEAN DEFAULT FALSE"))
+                conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS recovery_sent_at TIMESTAMP"))
+    except Exception as e:
+        # Pass gracefully if already migrated
+        pass
 
 
 _db_initialized = False

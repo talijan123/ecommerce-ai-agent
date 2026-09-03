@@ -1,9 +1,10 @@
 """
 WhatsApp Cloud API Service: Handles outbound messages and status receipts to Meta Graph API.
+Provides resilient asynchronous and synchronous messaging with automatic dry-run/mock logging.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import httpx
 from app.core.config import settings
 
@@ -19,31 +20,37 @@ class WhatsAppService:
     ):
         self.token = token or settings.WHATSAPP_TOKEN
         self.phone_number_id = phone_number_id or settings.WHATSAPP_PHONE_NUMBER_ID
-        self.api_version = api_version or settings.WHATSAPP_API_VERSION
+        self.api_version = api_version or settings.WHATSAPP_API_VERSION or "v20.0"
         self.base_url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}"
+
+    @property
+    def is_configured(self) -> bool:
+        """Check if live Meta credentials are provided."""
+        return bool(
+            self.token
+            and self.phone_number_id
+            and "your_" not in self.token
+            and "EAAB" in self.token
+        )
+
+    def _clean_phone(self, phone: str) -> str:
+        """Sanitize phone number to digits only."""
+        return "".join(c for c in str(phone) if c.isdigit())
 
     async def send_text_message(self, to_phone_number: str, message_text: str) -> Dict[str, Any]:
         """
-        Send an outbound text message to a customer's WhatsApp number.
-
-        Args:
-            to_phone_number: Destination phone number in international format (e.g., '923001234567' or '+14155552671').
-            message_text: The synthesized AI assistant response.
-
-        Returns:
-            Dict containing API response details or mock success acknowledgment.
+        Send an outbound text message to a customer's WhatsApp number (Async).
         """
-        # Clean phone number (remove '+', spaces, dashes)
-        cleaned_phone = to_phone_number.replace("+", "").replace(" ", "").replace("-", "").strip()
+        cleaned_phone = self._clean_phone(to_phone_number)
 
-        # If credentials are not set (e.g. local testing / dev mode), log and simulate success
-        if not self.token or not self.phone_number_id or "your_" in self.token:
+        # Mock / Dry-run handling if credentials are not configured
+        if not self.is_configured:
             logger.info(
-                f"📱 [WhatsApp Mock Dispatch]: Simulated reply to {cleaned_phone}: {message_text[:80]}..."
+                f"📱 [WhatsApp Dry-Run] To: {cleaned_phone} | Message: {message_text[:120]}..."
             )
             return {
                 "success": True,
-                "simulated": True,
+                "mock": True,
                 "recipient": cleaned_phone,
                 "message": message_text,
             }
@@ -58,7 +65,7 @@ class WhatsAppService:
             "recipient_type": "individual",
             "to": cleaned_phone,
             "type": "text",
-            "text": {"preview_url": False, "body": message_text},
+            "text": {"preview_url": True, "body": message_text},
         }
 
         try:
@@ -66,21 +73,112 @@ class WhatsAppService:
                 response = await client.post(url, json=payload, headers=headers)
                 response.raise_for_status()
                 data = response.json()
-                logger.info(f"✅ WhatsApp message successfully sent to {cleaned_phone}: {data}")
-                return {"success": True, "data": data}
+                logger.info(f"✅ WhatsApp message delivered to {cleaned_phone}: {data}")
+                return {"success": True, "data": data, "mock": False}
         except httpx.HTTPStatusError as e:
             error_details = e.response.text
             logger.error(f"❌ Meta Graph API Error ({e.response.status_code}): {error_details}")
-            return {"success": False, "error": error_details}
+            return {"success": False, "error": error_details, "mock": False}
         except Exception as e:
             logger.error(f"❌ Failed to dispatch WhatsApp message: {str(e)}")
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": str(e), "mock": False}
+
+    def send_text_message_sync(self, to_phone_number: str, message_text: str) -> Dict[str, Any]:
+        """
+        Synchronous wrapper for outbound text messaging.
+        """
+        cleaned_phone = self._clean_phone(to_phone_number)
+
+        if not self.is_configured:
+            logger.info(
+                f"📱 [WhatsApp Dry-Run (Sync)] To: {cleaned_phone} | Message: {message_text[:120]}..."
+            )
+            return {
+                "success": True,
+                "mock": True,
+                "recipient": cleaned_phone,
+                "message": message_text,
+            }
+
+        url = f"{self.base_url}/messages"
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": cleaned_phone,
+            "type": "text",
+            "text": {"preview_url": True, "body": message_text},
+        }
+
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                response = client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+                logger.info(f"✅ WhatsApp message delivered to {cleaned_phone}: {data}")
+                return {"success": True, "data": data, "mock": False}
+        except Exception as e:
+            logger.error(f"❌ Failed to dispatch WhatsApp message: {str(e)}")
+            return {"success": False, "error": str(e), "mock": False}
+
+    async def send_template_message(
+        self,
+        to_phone_number: str,
+        template_name: str,
+        components: Optional[List[Dict[str, Any]]] = None,
+        language_code: str = "en_US",
+    ) -> Dict[str, Any]:
+        """
+        Send an official Meta pre-approved WhatsApp template message (Async).
+        """
+        cleaned_phone = self._clean_phone(to_phone_number)
+
+        if not self.is_configured:
+            logger.info(
+                f"📱 [WhatsApp Template Dry-Run] To: {cleaned_phone} | Template: {template_name}"
+            )
+            return {
+                "success": True,
+                "mock": True,
+                "recipient": cleaned_phone,
+                "template": template_name,
+            }
+
+        url = f"{self.base_url}/messages"
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": cleaned_phone,
+            "type": "template",
+            "template": {
+                "name": template_name,
+                "language": {"code": language_code},
+                "components": components or [],
+            },
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+                return {"success": True, "data": data, "mock": False}
+        except Exception as e:
+            logger.error(f"❌ WhatsApp template dispatch failed: {str(e)}")
+            return {"success": False, "error": str(e), "mock": False}
 
     async def mark_message_as_read(self, message_id: str) -> bool:
         """
         Mark an incoming WhatsApp message as read to display blue checkmarks to the user.
         """
-        if not self.token or not self.phone_number_id or "your_" in self.token:
+        if not self.is_configured:
             return True
 
         url = f"{self.base_url}/messages"
@@ -105,3 +203,16 @@ class WhatsAppService:
 
 # Singleton instance
 whatsapp_service = WhatsAppService()
+
+
+# Top-level helper functions for direct module-level import
+def send_whatsapp_text_message(to_phone: str, message: str) -> Dict[str, Any]:
+    """Helper function to send a text message via whatsapp_service."""
+    return whatsapp_service.send_text_message_sync(to_phone, message)
+
+
+async def send_whatsapp_template_message(
+    to_phone: str, template_name: str, components: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
+    """Helper function to send a template message via whatsapp_service."""
+    return await whatsapp_service.send_template_message(to_phone, template_name, components)

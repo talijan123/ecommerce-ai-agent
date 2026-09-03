@@ -1,11 +1,11 @@
 """
 Admin Endpoints: Provides aggregated metrics, conversation history index,
-product catalog list, and orders for the Merchant Dashboard.
+product catalog list, orders, and automated WhatsApp cart recovery triggers.
 All handlers wrap logic in try/except blocks to ensure CORS headers and clean JSON responses.
 """
 
-from typing import List, Dict, Any
-from fastapi import APIRouter, Depends, status
+from typing import List, Dict, Any, Optional
+from fastapi import APIRouter, Depends, status, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct
@@ -15,6 +15,7 @@ from app.models.order import Order
 from app.models.product import Product
 from app.models.cart import CartSession
 from app.models.chat import ChatHistory
+from app.services.cart_recovery import cart_recovery_service
 
 router = APIRouter()
 
@@ -142,3 +143,42 @@ def list_orders(db: Session = Depends(get_db)):
     except Exception as e:
         print(f"[ERROR] /admin/orders failed: {e}")
         return []
+
+
+@router.post(
+    "/admin/recovery/trigger-whatsapp",
+    summary="Trigger Automated WhatsApp Abandoned Cart Recovery",
+    description="Dispatches personalized WhatsApp recovery messages with discount codes for all unrecovered carts."
+)
+def trigger_whatsapp_cart_recovery(
+    session_id: Optional[str] = Query(None, description="Optional specific cart session ID to recover"),
+    include_already_sent: bool = Query(False, description="If true, re-send to carts that already received recovery messages"),
+    db: Session = Depends(get_db),
+):
+    """
+    Automated WhatsApp Abandoned Cart Recovery dispatcher.
+    Evaluates cart sessions, composes personalized promotional WhatsApp messages,
+    and dispatches them via Meta Cloud API.
+    """
+    try:
+        if session_id:
+            cart = db.query(CartSession).filter(CartSession.session_id == session_id).first()
+            if not cart:
+                return JSONResponse(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    content={"success": False, "error": f"Cart session '{session_id}' not found."},
+                )
+            result = cart_recovery_service.recover_cart_session(db, cart)
+            return {"success": True, "mode": "single", "result": result}
+        else:
+            batch_result = cart_recovery_service.dispatch_all_abandoned_carts(
+                db=db,
+                include_already_sent=include_already_sent,
+            )
+            return {"success": True, "mode": "batch", "result": batch_result}
+    except Exception as e:
+        print(f"[ERROR] WhatsApp cart recovery trigger failed: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "error": str(e)},
+        )

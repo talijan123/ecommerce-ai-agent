@@ -195,7 +195,9 @@ def seed_real_products():
         demo_carts = [
             CartSession(
                 session_id="sess_abc123",
+                customer_name="Sarah Smith",
                 customer_email="sarah.smith@example.com",
+                customer_phone="+14155552671",
                 abandoned_items=[
                     {"name": first_product.title, "size": first_product.size_variants[0]["size"], "price": first_product.price, "quantity": 1}
                 ],
@@ -203,10 +205,13 @@ def seed_real_products():
                 discount_code="SAVE15",
                 discount_percentage=15,
                 expires_in_hours=24,
+                recovery_sent=False,
             ),
             CartSession(
                 session_id="sess_xyz789",
+                customer_name="Ali Khan",
                 customer_email="ali.khan@example.com",
+                customer_phone="+923001234567",
                 abandoned_items=[
                     {"name": third_product.title, "size": third_product.size_variants[0]["size"], "price": third_product.price, "quantity": 1}
                 ],
@@ -214,6 +219,7 @@ def seed_real_products():
                 discount_code="RECOVER10",
                 discount_percentage=10,
                 expires_in_hours=48,
+                recovery_sent=False,
             ),
         ]
         for cart in demo_carts:
