@@ -5,12 +5,12 @@ Loads environment variables seamlessly from .env file or system environment.
 
 import os
 from typing import List, Union
-from pydantic import AnyHttpUrl, Field, field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-IS_VERCEL = bool(os.environ.get("VERCEL"))
-DEFAULT_DB_URL = "sqlite:////tmp/ecommerce.db" if IS_VERCEL else "sqlite:///./ecommerce.db"
+DIRECT_SUPABASE_URL = "postgresql://postgres:Talal12%23%40%2C%2C@db.wmkhqqbpcppnekuzrpyb.supabase.co:5432/postgres"
+DEFAULT_DB_URL = os.environ.get("DATABASE_URL") or DIRECT_SUPABASE_URL
 
 
 class Settings(BaseSettings):
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     WHATSAPP_VERIFY_TOKEN: str = Field(default="autocommerce_wa_verify_token_123")
     WHATSAPP_API_VERSION: str = Field(default="v21.0")
 
-    # Database Settings (Defaults to local SQLite, easily switchable to Supabase/PostgreSQL)
+    # Database Settings (Direct Supabase PostgreSQL connection)
     DATABASE_URL: str = Field(default=DEFAULT_DB_URL)
 
     # CORS Origins
@@ -41,7 +41,9 @@ class Settings(BaseSettings):
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def assemble_database_url(cls, v: str) -> str:
-        if v and isinstance(v, str) and v.startswith("postgres://"):
+        if not v:
+            return DIRECT_SUPABASE_URL
+        if isinstance(v, str) and v.startswith("postgres://"):
             return v.replace("postgres://", "postgresql://", 1)
         return v
 
