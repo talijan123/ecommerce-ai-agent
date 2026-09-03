@@ -18,10 +18,25 @@ class WhatsAppService:
         phone_number_id: Optional[str] = None,
         api_version: Optional[str] = None,
     ):
-        self.token = token or settings.WHATSAPP_TOKEN
-        self.phone_number_id = phone_number_id or settings.WHATSAPP_PHONE_NUMBER_ID
-        self.api_version = api_version or settings.WHATSAPP_API_VERSION or "v20.0"
-        self.base_url = f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}"
+        self._token = token
+        self._phone_number_id = phone_number_id
+        self._api_version = api_version
+
+    @property
+    def token(self) -> str:
+        return self._token or settings.WHATSAPP_TOKEN
+
+    @property
+    def phone_number_id(self) -> str:
+        return self._phone_number_id or settings.WHATSAPP_PHONE_NUMBER_ID
+
+    @property
+    def api_version(self) -> str:
+        return self._api_version or settings.WHATSAPP_API_VERSION or "v21.0"
+
+    @property
+    def base_url(self) -> str:
+        return f"https://graph.facebook.com/{self.api_version}/{self.phone_number_id}"
 
     @property
     def is_configured(self) -> bool:
@@ -30,7 +45,9 @@ class WhatsAppService:
             self.token
             and self.phone_number_id
             and "your_" not in self.token
-            and "EAAB" in self.token
+            and (self.token.startswith("EAA") or len(self.token) > 30)
+            and str(self.phone_number_id).strip() != ""
+            and "123456" not in str(self.phone_number_id)
         )
 
     def _clean_phone(self, phone: str) -> str:
@@ -74,11 +91,11 @@ class WhatsAppService:
                 response.raise_for_status()
                 data = response.json()
                 logger.info(f"✅ WhatsApp message delivered to {cleaned_phone}: {data}")
-                return {"success": True, "data": data, "mock": False}
+                return {"success": True, "data": data, "mock": False, "status_code": response.status_code}
         except httpx.HTTPStatusError as e:
             error_details = e.response.text
             logger.error(f"❌ Meta Graph API Error ({e.response.status_code}): {error_details}")
-            return {"success": False, "error": error_details, "mock": False}
+            return {"success": False, "error": error_details, "status_code": e.response.status_code, "mock": False}
         except Exception as e:
             logger.error(f"❌ Failed to dispatch WhatsApp message: {str(e)}")
             return {"success": False, "error": str(e), "mock": False}
@@ -119,7 +136,11 @@ class WhatsAppService:
                 response.raise_for_status()
                 data = response.json()
                 logger.info(f"✅ WhatsApp message delivered to {cleaned_phone}: {data}")
-                return {"success": True, "data": data, "mock": False}
+                return {"success": True, "data": data, "mock": False, "status_code": response.status_code}
+        except httpx.HTTPStatusError as e:
+            error_details = e.response.text
+            logger.error(f"❌ Meta Graph API Error ({e.response.status_code}): {error_details}")
+            return {"success": False, "error": error_details, "status_code": e.response.status_code, "mock": False}
         except Exception as e:
             logger.error(f"❌ Failed to dispatch WhatsApp message: {str(e)}")
             return {"success": False, "error": str(e), "mock": False}

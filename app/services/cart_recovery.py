@@ -117,7 +117,8 @@ class CartRecoveryService:
             "discount_percentage": discount_percentage,
             "items_summary": items_summary,
             "status": "sent",
-            "mock": dispatch_result.get("mock", True),
+            "mock": dispatch_result.get("mock", False),
+            "dispatch_result": dispatch_result,
             "message": message_text,
         }
 
