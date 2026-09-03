@@ -14,10 +14,14 @@ class VariantSchema(BaseModel):
 class ProductBase(BaseModel):
     sku: str
     title: str
+    name: Optional[str] = None
     description: Optional[str] = None
     category: str
     price: float
     stock_quantity: int = 0
+    stock: Optional[int] = None
+    rating: Optional[float] = 0.0
+    image_url: Optional[str] = None
     size_variants: List[Dict[str, Any]] = Field(default_factory=list)
 
 

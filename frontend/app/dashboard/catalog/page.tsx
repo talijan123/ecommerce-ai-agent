@@ -238,7 +238,7 @@ export default function CatalogAndOrdersPage() {
                     filteredProducts.map((p) => {
                       const isLowStock = p.stock_quantity <= 5;
                       const hasOutOfStockVariant = (p.size_variants || []).some((v) => v.stock === 0);
-                      const img = getProductImage(p.sku, p.category, p.title);
+                      const img = getProductImage(p.sku, p.category, p.title, p.image_url);
 
                       return (
                         <tr key={p.id} className="hover:bg-zinc-800/30 transition-colors">

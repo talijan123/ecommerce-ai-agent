@@ -20,7 +20,11 @@ const CATEGORY_FALLBACKS: Record<string, string> = {
 
 const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=800&auto=format&fit=crop&q=80";
 
-export function getProductImage(sku?: string, category?: string, title?: string): string {
+export function getProductImage(sku?: string, category?: string, title?: string, imageUrl?: string): string {
+  if (imageUrl && imageUrl.trim().length > 0) {
+    return imageUrl.trim();
+  }
+
   if (sku && PRODUCT_IMAGES[sku]) {
     return PRODUCT_IMAGES[sku];
   }

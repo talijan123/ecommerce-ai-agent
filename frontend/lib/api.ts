@@ -71,10 +71,14 @@ export interface Product {
   id: number;
   sku: string;
   title: string;
+  name?: string;
   description?: string;
   category: string;
   price: number;
   stock_quantity: number;
+  stock?: number;
+  rating?: number;
+  image_url?: string;
   size_variants: ProductVariant[];
   created_at?: string;
 }

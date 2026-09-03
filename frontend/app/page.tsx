@@ -126,7 +126,7 @@ export default function StorefrontPage() {
   // Cart operations
   const handleAddToCart = (product: Product) => {
     const size = selectedSizes[product.id] || product.size_variants?.[0]?.size || "Standard";
-    const image = getProductImage(product.sku, product.category, product.title);
+    const image = getProductImage(product.sku, product.category, product.title, product.image_url);
 
     setCart((prev) => {
       const existing = prev.find((item) => item.productId === product.id && item.size === size);
@@ -481,7 +481,7 @@ export default function StorefrontPage() {
                 currentVariant !== undefined ? currentVariant.stock : product.stock_quantity;
               const isOutOfStock = variantStock === 0;
 
-              const imageUrl = getProductImage(product.sku, product.category, product.title);
+              const imageUrl = getProductImage(product.sku, product.category, product.title, product.image_url);
               const isImageLoaded = imagesLoaded[product.id] || false;
 
               return (
