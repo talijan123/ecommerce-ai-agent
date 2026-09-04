@@ -15,7 +15,11 @@ from app.models.order import Order
 from app.models.product import Product
 from app.models.cart import CartSession
 from app.models.chat import ChatHistory
-from app.services.cart_recovery import cart_recovery_service
+from app.services.cart_recovery import (
+    cart_recovery_service,
+    dispatch_cart_recovery,
+    process_abandoned_cart_recoveries,
+)
 
 router = APIRouter()
 
@@ -182,3 +186,31 @@ def trigger_whatsapp_cart_recovery(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"success": False, "error": str(e)},
         )
+
+
+@router.post(
+    "/admin/recovery/run-cron-now",
+    summary="Manually Trigger Abandoned Cart Recovery Cron Job",
+    description="Immediately runs the automated abandoned cart evaluation and recovery worker without waiting for the periodic 15-minute schedule."
+)
+def run_abandoned_cart_cron_now(
+    threshold_minutes: Optional[int] = Query(None, description="Optional custom abandonment threshold in minutes (defaults to configured threshold, e.g. 30)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Manual admin trigger for the background recovery worker.
+    Evaluates all carts matching abandoned recovery criteria and dispatches WhatsApp messages.
+    """
+    try:
+        result = process_abandoned_cart_recoveries(
+            threshold_minutes=threshold_minutes,
+            db=db,
+        )
+        return {"success": True, "result": result}
+    except Exception as e:
+        print(f"[ERROR] Manual cart recovery cron run failed: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "error": str(e)},
+        )
+

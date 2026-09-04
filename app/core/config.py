@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     WHATSAPP_VERIFY_TOKEN: str = Field(default="autocommerce_wa_verify_token_123")
     WHATSAPP_API_VERSION: str = Field(default="v21.0")
 
+    # Abandoned Cart Background Worker & Recovery Settings
+    RECOVERY_CRON_INTERVAL_MINUTES: int = Field(default=15)
+    RECOVERY_ABANDON_THRESHOLD_MINUTES: int = Field(default=30)
+    ENABLE_RECOVERY_SCHEDULER: bool = Field(default=True)
+
     # Database Settings (Direct Supabase PostgreSQL connection)
     DATABASE_URL: str = Field(default=DEFAULT_DB_URL)
 

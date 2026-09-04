@@ -25,6 +25,7 @@ class CartSession(Base):
     recovery_sent = Column(Boolean, default=False, nullable=False)
     recovery_sent_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=True)
 
     def to_dict(self):
         return {
@@ -43,4 +44,6 @@ class CartSession(Base):
             "recovery_sent": self.recovery_sent,
             "recovery_sent_at": self.recovery_sent_at.isoformat() if self.recovery_sent_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": (self.updated_at or self.created_at).isoformat() if (self.updated_at or self.created_at) else None,
         }
+

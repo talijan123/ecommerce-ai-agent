@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import Base, engine, get_db, ensure_db_initialized, create_db_and_tables
+from app.core.scheduler import start_scheduler, shutdown_scheduler
 from app.api.v1.api import api_router
 from app.api.v1.endpoints.admin import list_products
 from app.api.v1.endpoints.chat import send_chat_message
@@ -22,14 +23,26 @@ from app.schemas.chat import ChatRequest, ChatResponse
 async def lifespan(app: FastAPI):
     """
     Application Lifespan:
-    - Runs on startup: Creates all database tables and seeds catalog if empty.
-    - Runs on shutdown: Cleanly cleans up resources.
+    - Runs on startup: Creates all database tables, seeds catalog if empty, and starts background workers.
+    - Runs on shutdown: Gracefully shuts down background scheduler and cleans up resources.
     """
     try:
         ensure_db_initialized()
     except Exception as e:
         print(f"Database initialization warning: {e}")
+
+    try:
+        start_scheduler()
+    except Exception as e:
+        print(f"Scheduler startup warning: {e}")
+
     yield
+
+    try:
+        shutdown_scheduler()
+    except Exception as e:
+        print(f"Scheduler shutdown warning: {e}")
+
 
 
 app = FastAPI(

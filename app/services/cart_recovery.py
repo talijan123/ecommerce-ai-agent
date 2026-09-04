@@ -174,3 +174,143 @@ class CartRecoveryService:
 
 # Singleton instance
 cart_recovery_service = CartRecoveryService()
+
+
+def dispatch_cart_recovery(
+    session_id: str,
+    db: Optional[Session] = None,
+    override_phone: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Dispatch recovery WhatsApp message for a specific CartSession by session_id.
+    Marks recovery_sent = True, logs dispatch outcome (WAMID or error), and commits to DB.
+    """
+    from app.core.database import SessionLocal
+
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+
+    try:
+        cart = db.query(CartSession).filter(CartSession.session_id == session_id).first()
+        if not cart:
+            logger.warning(f"[CartRecovery] Cart session '{session_id}' not found.")
+            return {
+                "session_id": session_id,
+                "status": "error",
+                "error": f"Cart session '{session_id}' not found.",
+            }
+
+        result = cart_recovery_service.recover_cart_session(
+            db=db,
+            cart=cart,
+            override_phone=override_phone,
+        )
+
+        dispatch_res = result.get("dispatch_result", {})
+        wamid = dispatch_res.get("message_id")
+        if wamid:
+            logger.info(f"✅ [CartRecovery] Session {session_id} recovery dispatched successfully. WAMID: {wamid}")
+        else:
+            status_val = result.get("status")
+            logger.info(f"ℹ️ [CartRecovery] Session {session_id} recovery processed with status: {status_val}")
+
+        return result
+    except Exception as e:
+        logger.error(f"❌ [CartRecovery] Error dispatching cart recovery for {session_id}: {e}", exc_info=True)
+        return {
+            "session_id": session_id,
+            "status": "error",
+            "error": str(e),
+        }
+    finally:
+        if should_close:
+            db.close()
+
+
+def process_abandoned_cart_recoveries(
+    threshold_minutes: Optional[int] = None,
+    db: Optional[Session] = None,
+) -> Dict[str, Any]:
+    """
+    Periodic Cron Job worker:
+    Queries abandoned carts where:
+      - is_recovered == False
+      - recovery_sent == False
+      - updated_at (or created_at) <= now() - threshold (default 30 mins)
+      - customer_phone is not null/empty
+    Dispatches recovery WhatsApp promotions with discount codes, updates recovery_sent = True,
+    and logs outcomes.
+    """
+    from datetime import timedelta
+    from sqlalchemy import or_, and_
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+
+    threshold = threshold_minutes if threshold_minutes is not None else settings.RECOVERY_ABANDON_THRESHOLD_MINUTES
+    cutoff_utc = datetime.now(timezone.utc) - timedelta(minutes=threshold)
+    cutoff_naive = cutoff_utc.replace(tzinfo=None)
+
+    logger.info(f"🔄 [Recovery Worker] Starting abandoned cart recovery check (Threshold: {threshold} mins, Cutoff: {cutoff_utc.isoformat()})...")
+
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+
+    try:
+        # Query eligible abandoned cart sessions
+        query = db.query(CartSession).filter(
+            CartSession.is_recovered == False,
+            CartSession.recovery_sent == False,
+            CartSession.customer_phone.isnot(None),
+            CartSession.customer_phone != "",
+            or_(
+                CartSession.updated_at <= cutoff_utc,
+                and_(CartSession.updated_at.is_(None), CartSession.created_at <= cutoff_utc),
+                CartSession.updated_at <= cutoff_naive,
+                and_(CartSession.updated_at.is_(None), CartSession.created_at <= cutoff_naive),
+            ),
+        )
+
+        eligible_carts = query.all()
+        logger.info(f"🔎 [Recovery Worker] Identified {len(eligible_carts)} eligible abandoned cart(s) for recovery.")
+
+        dispatched = []
+        skipped = []
+
+        for cart in eligible_carts:
+            outcome = dispatch_cart_recovery(session_id=cart.session_id, db=db)
+            if outcome.get("status") == "sent":
+                dispatched.append(outcome)
+            else:
+                skipped.append(outcome)
+
+        summary = {
+            "status": "completed",
+            "threshold_minutes": threshold,
+            "cutoff_timestamp": cutoff_utc.isoformat(),
+            "total_evaluated": len(eligible_carts),
+            "total_dispatched": len(dispatched),
+            "total_skipped": len(skipped),
+            "dispatched_sessions": dispatched,
+            "skipped_sessions": skipped,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+        logger.info(
+            f"🎯 [Recovery Worker] Finished recovery run: {len(dispatched)} dispatched, {len(skipped)} skipped out of {len(eligible_carts)} evaluated."
+        )
+        return summary
+
+    except Exception as e:
+        logger.error(f"❌ [Recovery Worker] Abandoned cart recovery cron run failed: {e}", exc_info=True)
+        return {
+            "status": "error",
+            "error": str(e),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    finally:
+        if should_close:
+            db.close()
