@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Request, Response, Query, BackgroundTasks, status
 from app.core.config import settings
 from app.core.database import SessionLocal
+from app.services.chat_service import ChatService
 from app.services.cart_recovery import track_cart_engagement
 from app.services.ai_support_service import ai_support_service
 from app.services.whatsapp_service import whatsapp_service
@@ -19,38 +20,54 @@ async def handle_inbound_whatsapp_message(
     """
     Intelligent Inbound Message Processor (Executed asynchronously via BackgroundTasks):
     1. Tracks and updates CartSession engagement in database (status='engaged', response timestamp).
-    2. Generates a contextual AI customer support reply via Gemini AI.
-    3. Dispatches reply to customer's WhatsApp number via Meta Cloud API.
-    4. Marks incoming message as read on WhatsApp.
+    2. Loads multi-turn conversation memory (last 6-10 messages, < 4h active window) for this WhatsApp user.
+    3. Persists incoming user message in ChatHistory.
+    4. Generates contextual AI customer support reply via Gemini AI with multi-turn history & Supabase tools.
+    5. Persists assistant's generated response in ChatHistory.
+    6. Dispatches reply to customer's WhatsApp number via Meta Cloud API.
+    7. Marks incoming message as read on WhatsApp.
     Guarantees database session cleanup via a finally block.
     """
     db = SessionLocal()
     try:
         logger.info(f"📩 [WhatsApp Inbound Worker] Message from: {sender_phone} | Body: '{message_text}'")
+        session_id = f"wa_{sender_phone}"
+        chat_service = ChatService(db)
 
-        # 1. Update CartSession engagement in DB
+        # 1. Fetch multi-turn conversation history for this user (< 4h inactivity, max 10 turns)
+        history = chat_service.get_gemini_history(session_id=session_id, limit=10, max_inactivity_hours=4.0)
+
+        # 2. Update CartSession engagement in DB
         cart = track_cart_engagement(
             sender_phone=sender_phone,
             message_text=message_text,
             db=db,
         )
 
-        # 2. Generate contextual AI support reply using Gemini AI
+        # 3. Store incoming user message in database
+        chat_service.add_message(session_id=session_id, role="user", content=message_text)
+
+        # 4. Generate contextual AI support reply using Gemini AI with multi-turn history
         ai_reply = ai_support_service.generate_support_reply(
             customer_message=message_text,
             cart_session=cart,
             customer_phone=sender_phone,
+            chat_history=history,
+            db=db,
         )
         logger.info(f"🤖 [WhatsApp AI Reply to {sender_phone}]: '{ai_reply}'")
 
-        # 3. Dispatch outbound reply message to WhatsApp
+        # 5. Store assistant reply in database
+        chat_service.add_message(session_id=session_id, role="assistant", content=ai_reply)
+
+        # 6. Dispatch outbound reply message to WhatsApp
         dispatch_result = await whatsapp_service.send_text_message(
             to_phone_number=sender_phone,
             message_text=ai_reply,
         )
         logger.info(f"📤 [WhatsApp Outbound Dispatch Result]: {dispatch_result}")
 
-        # 4. Mark incoming message as read
+        # 7. Mark incoming message as read
         if message_id:
             await whatsapp_service.mark_message_as_read(message_id)
 

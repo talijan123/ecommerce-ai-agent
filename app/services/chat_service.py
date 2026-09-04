@@ -1,7 +1,8 @@
 """
-ChatService: Manages conversation history persistence and context retrieval per session_id.
+ChatService: Manages conversation history persistence, context retrieval, and multi-turn chat memory per session_id.
 """
 
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from app.models.chat import ChatHistory
@@ -37,6 +38,86 @@ class ChatService:
         except Exception:
             return []
 
+    def get_gemini_history(
+        self,
+        session_id: str,
+        limit: int = 10,
+        max_inactivity_hours: float = 4.0,
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch multi-turn conversation history formatted for Gemini generateContent contents.
+        Applies context pruning (most recent 6-10 messages) and active session window check
+        (cleans context if user has been inactive for > 4 hours).
+
+        Returns:
+            List[Dict[str, Any]]: List of turns e.g. [{"role": "user", "parts": [{"text": "..."}]}, {"role": "model", "parts": [{"text": "..."}]}]
+        """
+        try:
+            # Query most recent messages for the given session
+            records = (
+                self.db.query(ChatHistory)
+                .filter(ChatHistory.session_id == session_id)
+                .order_by(ChatHistory.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+
+            if not records:
+                return []
+
+            # Reverse to chronological order (oldest to newest)
+            records = list(reversed(records))
+            now = datetime.now(timezone.utc)
+
+            # Inactivity Check: If the last recorded message is older than max_inactivity_hours, reset context
+            last_msg_time = records[-1].created_at
+            if last_msg_time:
+                if last_msg_time.tzinfo is None:
+                    last_msg_time = last_msg_time.replace(tzinfo=timezone.utc)
+                if (now - last_msg_time).total_seconds() > max_inactivity_hours * 3600:
+                    return []
+
+            # Find cutoff index for any mid-history gap > max_inactivity_hours
+            cutoff_index = 0
+            for i in range(len(records)):
+                rec = records[i]
+                rec_time = rec.created_at
+                if rec_time and i > 0:
+                    prev_time = records[i - 1].created_at
+                    if rec_time.tzinfo is None:
+                        rec_time = rec_time.replace(tzinfo=timezone.utc)
+                    if prev_time and prev_time.tzinfo is None:
+                        prev_time = prev_time.replace(tzinfo=timezone.utc)
+                    if prev_time and (rec_time - prev_time).total_seconds() > max_inactivity_hours * 3600:
+                        cutoff_index = i
+
+            active_records = records[cutoff_index:]
+
+            # Format into Gemini's alternating role contents structure
+            gemini_contents: List[Dict[str, Any]] = []
+            for r in active_records:
+                if not r.content or not str(r.content).strip():
+                    continue
+
+                # Map role to "user" or "model"
+                g_role = "model" if r.role in ("assistant", "model") else "user"
+                content_text = str(r.content).strip()
+
+                # Consolidate consecutive messages with the same role
+                if gemini_contents and gemini_contents[-1]["role"] == g_role:
+                    prev_text = gemini_contents[-1]["parts"][0]["text"]
+                    gemini_contents[-1]["parts"][0]["text"] = f"{prev_text}\n{content_text}"
+                else:
+                    gemini_contents.append({
+                        "role": g_role,
+                        "parts": [{"text": content_text}]
+                    })
+
+            return gemini_contents
+
+        except Exception:
+            return []
+
     def add_message(
         self,
         session_id: str,
@@ -47,7 +128,7 @@ class ChatService:
         name: Optional[str] = None,
     ) -> Optional[ChatHistory]:
         """
-        Store a message or tool execution step in the database.
+        Store a message or tool execution step in the database with timestamps.
         """
         try:
             record = ChatHistory(
@@ -57,6 +138,7 @@ class ChatService:
                 tool_calls=tool_calls,
                 tool_call_id=tool_call_id,
                 name=name,
+                created_at=datetime.now(timezone.utc),
             )
             self.db.add(record)
             self.db.commit()

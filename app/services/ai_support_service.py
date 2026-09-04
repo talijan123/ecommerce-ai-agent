@@ -1,7 +1,7 @@
 """
 AI Customer Support Service for WhatsApp Inbound Conversations.
-Powered by Google Gemini API (gemini-2.5-flash) with dynamic Supabase Function Calling
-and seamless multi-model fallback (Groq / OpenAI / Deterministic).
+Powered by Google Gemini API (gemini-2.5-flash) with dynamic Supabase Function Calling,
+multi-turn conversation memory, and seamless fallback (Groq / OpenAI / Deterministic).
 Generates concise, friendly, and grounded support replies for active customers and abandoned cart recoveries.
 """
 
@@ -25,14 +25,15 @@ DEFAULT_SYSTEM_INSTRUCTION = (
     "You are a friendly, helpful WhatsApp customer support assistant for the AutoCommerce store.\n\n"
     "CRITICAL RULES & DIRECTIVES:\n"
     "1. Keep replies concise, helpful, and natural (1 to 3 short sentences maximum). Ideal for WhatsApp reading.\n"
-    "2. NO HALLUCINATIONS: When a customer asks about order status or product stock/inventory, you MUST call the provided tools (track_order, check_product_stock) to retrieve real-time data from Supabase before answering.\n"
-    "3. Language Matching: Match the customer's language. If they message in Roman Urdu (e.g., 'mera order kab tak deliver hoga?', 'kya delivery free hai?', 'kya COD hai?'), reply warmly and politely in Roman Urdu (e.g., 'Aapka order 2-4 business days me deliver ho jayega. Cash on Delivery (COD) bhi available hai!'). If they write in English, reply in English.\n"
-    "4. Store Knowledge & Policies:\n"
+    "2. NO HALLUCINATIONS: When a customer asks about order status or product stock/inventory, you MUST call the provided tools (track_order, check_product_stock) to retrieve real-time data from the store database before answering.\n"
+    "3. MULTI-TURN CONTEXT RESOLUTION: Use the conversation history to understand references (e.g. 'aur iski price kya hai?', 'is it available in blue?', 'where is it now?') based on previous products or orders discussed.\n"
+    "4. Language Matching: Match the customer's language. If they message in Roman Urdu (e.g., 'mera order kab tak deliver hoga?', 'kya delivery free hai?', 'kya COD hai?'), reply warmly and politely in Roman Urdu (e.g., 'Aapka order 2-4 business days me deliver ho jayega. Cash on Delivery (COD) bhi available hai!'). If they write in English, reply in English.\n"
+    "5. Store Knowledge & Policies:\n"
     "   - Standard Delivery Time: 2 to 4 business days.\n"
     "   - Payment Methods: Cash on Delivery (COD) is available nationwide.\n"
     "   - Return Policy: 7-day hassle-free return and replacement policy.\n"
     "   - Cart & Discounts: If the customer context has an active discount code or cart items, mention them warmly to encourage checkout.\n"
-    "5. Format: Do NOT use markdown headers, long bulleted lists, or robotic greetings. Use a warm tone and suitable emojis (e.g., 📦, ✨, 😊)."
+    "6. Format: Do NOT use markdown headers, long bulleted lists, or robotic greetings. Use a warm tone and suitable emojis (e.g., 📦, ✨, 😊)."
 )
 
 FALLBACK_SUPPORT_REPLY = (
@@ -44,7 +45,7 @@ FALLBACK_SUPPORT_REPLY = (
 GEMINI_FUNCTION_DECLARATIONS = [
     {
         "name": "track_order",
-        "description": "Queries the orders table in Supabase to track an order's status, courier, tracking number, created date, and items.",
+        "description": "Queries the orders table in the database to track an order's status, courier, tracking number, created date, and items.",
         "parameters": {
             "type": "OBJECT",
             "properties": {
@@ -58,7 +59,7 @@ GEMINI_FUNCTION_DECLARATIONS = [
     },
     {
         "name": "check_product_stock",
-        "description": "Queries the products/inventory table in Supabase for stock quantity, price, and in-stock availability.",
+        "description": "Queries the products/inventory table in the database for stock quantity, price, and in-stock availability.",
         "parameters": {
             "type": "OBJECT",
             "properties": {
@@ -154,11 +155,12 @@ class AISupportService:
         prompt: str,
         api_key: str,
         model: str,
+        chat_history: Optional[List[Dict[str, Any]]] = None,
         max_turns: int = 5,
     ) -> Optional[str]:
         """
-        Direct REST call to Google Gemini generateContent endpoint with dynamic Supabase
-        Function Calling loop and automatic model fallback.
+        Direct REST call to Google Gemini generateContent endpoint with multi-turn conversation memory,
+        dynamic Supabase Function Calling loop, and automatic model fallback.
         """
         primary_model = (model or "gemini-2.5-flash").replace("models/", "")
         candidate_models = [primary_model]
@@ -175,12 +177,22 @@ class AISupportService:
         for clean_model in candidate_models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
 
-            contents: List[Dict[str, Any]] = [
-                {
+            # 1. Build initial contents payload incorporating past multi-turn chat history
+            contents: List[Dict[str, Any]] = []
+            if chat_history:
+                for turn in chat_history:
+                    if isinstance(turn, dict) and "role" in turn and "parts" in turn:
+                        contents.append(turn)
+
+            # Append current turn prompt
+            if contents and contents[-1].get("role") == "user":
+                prev_text = contents[-1]["parts"][0].get("text", "")
+                contents[-1]["parts"][0]["text"] = f"{prev_text}\n{prompt}"
+            else:
+                contents.append({
                     "role": "user",
                     "parts": [{"text": prompt}]
-                }
-            ]
+                })
 
             turn = 0
             model_failed = False
@@ -271,11 +283,11 @@ class AISupportService:
                         break
 
                     elif response.status_code == 400:
-                        # Model may not support tools schema or thinkingConfig, try fallback without tools
+                        # Model may not support tools schema, try fallback generation
                         logger.info(f"[AISupport] Gemini model {clean_model} status 400, retrying simple generation...")
                         simple_payload = {
                             "system_instruction": {"parts": [{"text": self.system_instruction}]},
-                            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                            "contents": contents,
                             "generationConfig": {"temperature": 0.3, "maxOutputTokens": 800}
                         }
                         simple_resp = requests.post(url, json=simple_payload, timeout=20)
@@ -317,8 +329,12 @@ class AISupportService:
 
         return None
 
-    def _call_groq_fallback(self, prompt: str) -> Optional[str]:
-        """Fallback to Groq / OpenAI LLM provider with tool execution loop and multi-model fallback."""
+    def _call_groq_fallback(
+        self,
+        prompt: str,
+        chat_history: Optional[List[Dict[str, Any]]] = None,
+    ) -> Optional[str]:
+        """Fallback to Groq / OpenAI LLM provider with multi-turn memory and tool execution loop."""
         api_key = settings.GROQ_API_KEY or settings.OPENAI_API_KEY
         if not api_key:
             return None
@@ -336,7 +352,7 @@ class AISupportService:
                     "type": "function",
                     "function": {
                         "name": "track_order",
-                        "description": "Queries the orders table in Supabase to track an order's status, courier, tracking number, and items.",
+                        "description": "Queries the orders table in the database to track an order's status, courier, tracking number, and items.",
                         "parameters": {
                             "type": "object",
                             "properties": {
@@ -350,7 +366,7 @@ class AISupportService:
                     "type": "function",
                     "function": {
                         "name": "check_product_stock",
-                        "description": "Queries the products/inventory table in Supabase for stock quantity, price, and in-stock availability.",
+                        "description": "Queries the products/inventory table in the database for stock quantity, price, and in-stock availability.",
                         "parameters": {
                             "type": "object",
                             "properties": {
@@ -379,10 +395,20 @@ class AISupportService:
 
             for model_name in candidate_models:
                 try:
-                    messages = [
-                        {"role": "system", "content": self.system_instruction},
-                        {"role": "user", "content": prompt},
-                    ]
+                    messages = [{"role": "system", "content": self.system_instruction}]
+
+                    # Append past chat turns
+                    if chat_history:
+                        for h in chat_history:
+                            r = "assistant" if h.get("role") == "model" else "user"
+                            txt = ""
+                            parts = h.get("parts", [])
+                            if parts and isinstance(parts[0], dict):
+                                txt = parts[0].get("text", "")
+                            if txt:
+                                messages.append({"role": r, "content": txt})
+
+                    messages.append({"role": "user", "content": prompt})
 
                     turn = 0
                     while turn < 4:
@@ -436,13 +462,24 @@ class AISupportService:
         customer_message: str,
         cart_session: Optional[CartSession] = None,
         customer_phone: Optional[str] = None,
+        chat_history: Optional[List[Dict[str, Any]]] = None,
+        db: Optional[Any] = None,
     ) -> str:
         """
         Generate contextual AI response for an inbound customer WhatsApp message.
-        Tries Gemini API with Supabase Function Calling -> Groq/OpenAI -> Guaranteed Fallback.
+        Tries Gemini API with multi-turn chat memory & function calling -> Groq/OpenAI -> Guaranteed Fallback.
         """
         if not customer_message or not customer_message.strip():
             return self.fallback_reply
+
+        # Auto-fetch multi-turn chat history if db and customer_phone are provided but history was not
+        if chat_history is None and customer_phone and db is not None:
+            try:
+                from app.services.chat_service import ChatService
+                cs = ChatService(db)
+                chat_history = cs.get_gemini_history(f"wa_{customer_phone}", limit=10, max_inactivity_hours=4.0)
+            except Exception as e:
+                logger.warning(f"Could not load chat history for {customer_phone}: {e}")
 
         prompt = self._build_contextual_prompt(
             customer_message=customer_message.strip(),
@@ -458,19 +495,24 @@ class AISupportService:
         )
         gemini_model = settings.GEMINI_MODEL or "gemini-2.5-flash"
 
-        # 1. Attempt Gemini API with Supabase Function Calling
+        # 1. Attempt Gemini API with Multi-turn history and Function Calling
         if gemini_key and not gemini_key.startswith("your_"):
             try:
-                reply = self._call_gemini_api(prompt=prompt, api_key=gemini_key, model=gemini_model)
+                reply = self._call_gemini_api(
+                    prompt=prompt,
+                    api_key=gemini_key,
+                    model=gemini_model,
+                    chat_history=chat_history,
+                )
                 if reply:
                     logger.info(f"🤖 [AISupport] Gemini AI ({gemini_model}) reply generated successfully.")
                     return reply
             except Exception as e:
                 logger.warning(f"⚠️ [AISupport] Gemini API invocation failed: {e}")
 
-        # 2. Attempt secondary LLM Provider (Groq / OpenAI) with tool calling
+        # 2. Attempt secondary LLM Provider (Groq / OpenAI) with history and tool calling
         try:
-            secondary_reply = self._call_groq_fallback(prompt=prompt)
+            secondary_reply = self._call_groq_fallback(prompt=prompt, chat_history=chat_history)
             if secondary_reply:
                 logger.info("🤖 [AISupport] Secondary LLM reply generated successfully.")
                 return secondary_reply
