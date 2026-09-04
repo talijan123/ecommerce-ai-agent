@@ -40,7 +40,7 @@ load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
-LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.1-70b-versatile")
+LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 # System Prompt defining agent personality, behavioral constraints, and multilingual capabilities
@@ -110,7 +110,7 @@ def run_agent(
     messages.append({"role": "user", "content": user_query})
 
     turn_count = 0
-    model_name = os.getenv("LLM_MODEL") or (os.getenv("OPENAI_MODEL") if not os.getenv("GROQ_API_KEY") else "llama-3.1-70b-versatile")
+    model_name = os.getenv("LLM_MODEL") or (os.getenv("OPENAI_MODEL") if not os.getenv("GROQ_API_KEY") else "llama-3.3-70b-versatile")
 
     while turn_count < max_turns:
         turn_count += 1

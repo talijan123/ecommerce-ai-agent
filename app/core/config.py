@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = Field(default="")
     GOOGLE_API_KEY: str = Field(default="")
     LLM_BASE_URL: str = Field(default="https://api.groq.com/openai/v1")
-    LLM_MODEL: str = Field(default="llama-3.1-70b-versatile")
+    LLM_MODEL: str = Field(default="llama-3.3-70b-versatile")
     OPENAI_MODEL: str = Field(default="gpt-4o-mini")
     GEMINI_MODEL: str = Field(default="gemini-2.5-flash")
 
