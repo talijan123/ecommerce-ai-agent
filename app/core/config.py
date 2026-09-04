@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     # Database Settings (Direct Supabase PostgreSQL connection)
     DATABASE_URL: str = Field(default=DEFAULT_DB_URL)
 
+    # Supabase Client Settings (PostgREST / REST Client Integration)
+    SUPABASE_URL: str = Field(default="https://wmkhqqbpcppnekuzrpyb.supabase.co")
+    SUPABASE_KEY: str = Field(default="")
+    SUPABASE_SERVICE_ROLE_KEY: str = Field(default="")
+    SUPABASE_ANON_KEY: str = Field(default="")
+
     # CORS Origins
     CORS_ORIGINS: List[str] = Field(default=["*"])
 

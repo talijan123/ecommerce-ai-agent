@@ -150,12 +150,53 @@ OPENAI_TOOLS: List[Dict[str, Any]] = [
     }
 ]
 
+# Supabase Tool Schemas
+SUPABASE_TOOLS: List[Dict[str, Any]] = [
+    {
+        "type": "function",
+        "function": {
+            "name": "track_order",
+            "description": "Look up real-time status and shipping details for a customer order by Order ID in the database.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "order_id": {
+                        "type": "string",
+                        "description": "The unique order number provided by the customer (e.g., '1042', '#1043')."
+                    }
+                },
+                "required": ["order_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "check_product_stock",
+            "description": "Check product stock, price, and availability in the catalog by product name.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_name": {
+                        "type": "string",
+                        "description": "The name or keyword of the product."
+                    }
+                },
+                "required": ["product_name"]
+            }
+        }
+    }
+]
+
+from app.services.supabase_service import track_order, check_product_stock
 
 # Tool dispatcher map
 TOOL_MAP = {
     "get_order_status": get_order_status,
     "check_product_inventory": check_product_inventory,
     "apply_cart_recovery_discount": apply_cart_recovery_discount,
+    "track_order": track_order,
+    "check_product_stock": check_product_stock,
 }
 
 

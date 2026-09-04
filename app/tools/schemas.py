@@ -67,6 +67,44 @@ OPENAI_TOOLS: List[Dict[str, Any]] = [
     }
 ]
 
+# Supabase Tool Schemas for Gemini / Supabase Function Calling
+SUPABASE_TOOLS: List[Dict[str, Any]] = [
+    {
+        "type": "function",
+        "function": {
+            "name": "track_order",
+            "description": "Look up real-time status and shipping details for a customer order by Order ID in Supabase.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "order_id": {
+                        "type": "string",
+                        "description": "The unique order number provided by the customer (e.g., '1042', '#1043')."
+                    }
+                },
+                "required": ["order_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "check_product_stock",
+            "description": "Check product stock, price, and availability in the catalog by product name.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_name": {
+                        "type": "string",
+                        "description": "The name or keyword of the product."
+                    }
+                },
+                "required": ["product_name"]
+            }
+        }
+    }
+]
+
 
 def execute_tool_with_db(db: Session, tool_name: str, arguments: Dict[str, Any]) -> Any:
     """
@@ -76,11 +114,11 @@ def execute_tool_with_db(db: Session, tool_name: str, arguments: Dict[str, Any])
     inventory_service = InventoryService(db)
     cart_service = CartService(db)
 
-    if tool_name == "get_order_status":
+    if tool_name in ("get_order_status", "track_order"):
         order_id = arguments.get("order_id", "")
         return order_service.get_order_by_id_or_number(order_id)
 
-    elif tool_name == "check_product_inventory":
+    elif tool_name in ("check_product_inventory", "check_product_stock"):
         product_name = arguments.get("product_name", "")
         size = arguments.get("size")
         return inventory_service.check_inventory(product_name, size)
