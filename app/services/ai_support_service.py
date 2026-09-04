@@ -64,44 +64,54 @@ class AISupportService:
             return f"Customer WhatsApp Message:\n\"{customer_message}\""
 
     def _call_gemini_api(self, prompt: str, api_key: str, model: str) -> Optional[str]:
-        """Direct REST call to Google Gemini generateContent endpoint with strict timeout."""
-        clean_model = model or "gemini-2.5-flash"
-        # Support model names with or without 'models/' prefix
-        if clean_model.startswith("models/"):
-            clean_model = clean_model.replace("models/", "", 1)
+        """Direct REST call to Google Gemini generateContent endpoint with automatic model fallback and strict timeout."""
+        primary_model = (model or "gemini-3.5-flash").replace("models/", "")
+        candidate_models = [primary_model]
+        for fallback_model in ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"]:
+            if fallback_model not in candidate_models:
+                candidate_models.append(fallback_model)
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
+        for clean_model in candidate_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
 
-        payload = {
-            "system_instruction": {
-                "parts": [{"text": self.system_instruction}]
-            },
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": prompt}]
+            payload = {
+                "system_instruction": {
+                    "parts": [{"text": self.system_instruction}]
+                },
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": prompt}]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.3,
+                    "maxOutputTokens": 800,
                 }
-            ],
-            "generationConfig": {
-                "temperature": 0.3,
-                "maxOutputTokens": 150,
             }
-        }
 
-        response = requests.post(url, json=payload, timeout=6)
-        if response.status_code == 200:
-            data = response.json()
-            candidates = data.get("candidates", [])
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                if parts and "text" in parts[0]:
-                    reply = parts[0]["text"].strip()
-                    if reply:
-                        return reply
-        else:
-            logger.warning(
-                f"[AISupport] Gemini API returned status {response.status_code}: {response.text[:200]}"
-            )
+            try:
+                response = requests.post(url, json=payload, timeout=6)
+                if response.status_code == 200:
+                    data = response.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts and "text" in parts[0]:
+                            reply = parts[0]["text"].strip()
+                            if reply:
+                                return reply
+                elif response.status_code in (404, 503):
+                    # Model not available or temporarily overloaded, try next candidate
+                    logger.info(f"[AISupport] Gemini model {clean_model} status {response.status_code}, trying next model...")
+                    continue
+                else:
+                    logger.warning(
+                        f"[AISupport] Gemini API ({clean_model}) returned status {response.status_code}: {response.text[:200]}"
+                    )
+            except Exception as e:
+                logger.warning(f"[AISupport] Error requesting Gemini model {clean_model}: {e}")
+
         return None
 
     def _call_groq_fallback(self, prompt: str) -> Optional[str]:
@@ -118,6 +128,9 @@ class AISupportService:
                 timeout=6,
             )
             model_name = settings.LLM_MODEL or "llama-3.3-70b-versatile"
+            if "groq.com" in (settings.LLM_BASE_URL or "") and ("openai/" in model_name or "gpt" in model_name):
+                model_name = "llama-3.3-70b-versatile"
+
             completion = client.chat.completions.create(
                 model=model_name,
                 messages=[
