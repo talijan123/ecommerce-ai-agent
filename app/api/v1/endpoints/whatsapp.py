@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Request, Response, Query, BackgroundTasks, status
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -17,15 +17,16 @@ async def handle_inbound_whatsapp_message(
     message_id: Optional[str] = None,
 ):
     """
-    Intelligent Inbound Message Processor:
+    Intelligent Inbound Message Processor (Executed asynchronously via BackgroundTasks):
     1. Tracks and updates CartSession engagement in database (status='engaged', response timestamp).
     2. Generates a contextual AI customer support reply via Gemini AI.
     3. Dispatches reply to customer's WhatsApp number via Meta Cloud API.
-    4. Marks incoming message as read.
+    4. Marks incoming message as read on WhatsApp.
+    Guarantees database session cleanup via a finally block.
     """
     db = SessionLocal()
     try:
-        logger.info(f"📩 [WhatsApp Inbound] Received message from: {sender_phone} | Query: '{message_text}'")
+        logger.info(f"📩 [WhatsApp Inbound Worker] Message from: {sender_phone} | Body: '{message_text}'")
 
         # 1. Update CartSession engagement in DB
         cart = track_cart_engagement(
@@ -34,7 +35,7 @@ async def handle_inbound_whatsapp_message(
             db=db,
         )
 
-        # 2. Generate contextual AI support reply using Gemini
+        # 2. Generate contextual AI support reply using Gemini AI
         ai_reply = ai_support_service.generate_support_reply(
             customer_message=message_text,
             cart_session=cart,
@@ -59,14 +60,14 @@ async def handle_inbound_whatsapp_message(
         db.close()
 
 
-# Alias for backward compatibility with existing tests
+# Backward compatibility alias for tests and external callers
 process_whatsapp_inbound_message = handle_inbound_whatsapp_message
 
 
 @router.get(
     "/webhooks/whatsapp",
     summary="Meta Webhook Verification Handshake",
-    description="Validates the hub.verify_token and returns hub.challenge to confirm webhook ownership with Meta."
+    description="Validates the hub.verify_token against settings and returns raw hub.challenge to confirm webhook ownership with Meta.",
 )
 def verify_whatsapp_webhook(
     hub_mode: Optional[str] = Query(None, alias="hub.mode"),
@@ -74,71 +75,120 @@ def verify_whatsapp_webhook(
     hub_challenge: Optional[str] = Query(None, alias="hub.challenge"),
 ):
     """
-    Handles Meta's Webhook Subscription Verification Handshake.
+    Handles Meta's Webhook Subscription Verification Handshake (GET).
+    Meta sends:
+      - hub.mode = 'subscribe'
+      - hub.verify_token = <your_configured_verify_token>
+      - hub.challenge = <random_integer_or_string>
+    Must return 200 OK with the exact hub.challenge in the response body.
     """
-    logger.info(f"🔍 Meta Webhook Verification Attempt - mode: {hub_mode}, verify_token: {hub_verify_token}")
+    logger.info(f"🔍 Meta Webhook Verification Handshake Attempt - mode: {hub_mode}, verify_token: {hub_verify_token}")
 
     if hub_mode == "subscribe" and hub_verify_token == settings.WHATSAPP_VERIFY_TOKEN:
         logger.info("✅ Meta Webhook Verification Succeeded!")
         # Must return the raw hub.challenge string with 200 OK
-        return Response(content=str(hub_challenge), media_type="text/plain", status_code=status.HTTP_200_OK)
+        return Response(content=str(hub_challenge or ""), media_type="text/plain", status_code=status.HTTP_200_OK)
 
-    logger.warning("❌ Meta Webhook Verification Failed: Invalid verify token or mode.")
-    return Response(content="Forbidden: Verification Token Mismatch", status_code=status.HTTP_403_FORBIDDEN)
+    logger.warning("❌ Meta Webhook Verification Failed: Invalid verify token or subscription mode.")
+    return Response(content="Forbidden: Verification Token Mismatch", media_type="text/plain", status_code=status.HTTP_403_FORBIDDEN)
 
 
 @router.post(
     "/webhooks/whatsapp",
     summary="Receive WhatsApp Webhook Events",
-    description="Ingests incoming customer WhatsApp messages, tracks engagement, and triggers Gemini AI contextual replies."
+    description="Ingests incoming customer WhatsApp messages, handles status receipts, and schedules background AI support processing.",
 )
 async def receive_whatsapp_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
 ):
     """
-    Receives real-time events from Meta WhatsApp Cloud API.
-    Acknowledge with HTTP 200 immediately and process the engagement tracking and AI reply in the background.
+    Receives real-time webhook events from Meta WhatsApp Cloud API (POST).
+    Always responds with HTTP 200 immediately (< 3s SLA) and delegates message processing
+    to FastAPI BackgroundTasks.
     """
     try:
         payload: Dict[str, Any] = await request.json()
-    except Exception:
-        # Return 200 even on unparseable payloads so Meta does not disable the webhook
+    except Exception as err:
+        logger.warning(f"⚠️ Received invalid or empty JSON in WhatsApp webhook: {err}")
         return {"status": "EVENT_RECEIVED", "reason": "invalid_json"}
 
-    # Validate payload structure
-    entry_list = payload.get("entry", [])
-    if not entry_list:
+    if not isinstance(payload, dict):
+        return {"status": "EVENT_RECEIVED"}
+
+    entry_list: List[Dict[str, Any]] = payload.get("entry", [])
+    if not isinstance(entry_list, list):
         return {"status": "EVENT_RECEIVED"}
 
     for entry in entry_list:
+        if not isinstance(entry, dict):
+            continue
+
         changes = entry.get("changes", [])
+        if not isinstance(changes, list):
+            continue
+
         for change in changes:
+            if not isinstance(change, dict):
+                continue
+
             value = change.get("value", {})
-            
-            # Check for incoming customer messages
-            messages = value.get("messages", [])
-            if not messages:
-                # Could be a status receipt (sent/delivered/read) - acknowledge and ignore
+            if not isinstance(value, dict):
+                continue
+
+            # 1. Handle delivery status updates (sent / delivered / read / failed) gracefully
+            statuses = value.get("statuses")
+            if statuses and isinstance(statuses, list):
+                for st in statuses:
+                    if isinstance(st, dict):
+                        logger.info(
+                            f"📋 [WhatsApp Status Receipt] ID: {st.get('id')} | Status: {st.get('status')} | Recipient: {st.get('recipient_id')}"
+                        )
+                continue
+
+            # 2. Extract incoming customer messages
+            messages = value.get("messages")
+            if not messages or not isinstance(messages, list):
                 continue
 
             for msg in messages:
-                # Process text messages
-                msg_type = msg.get("type")
+                if not isinstance(msg, dict):
+                    continue
+
                 sender_phone = msg.get("from")
                 message_id = msg.get("id")
+                msg_type = msg.get("type", "text")
 
-                if msg_type == "text" and sender_phone:
-                    text_body = msg.get("text", {}).get("body", "").strip()
-                    if text_body:
-                        # Queue background task for engagement tracking and Gemini reply
-                        background_tasks.add_task(
-                            handle_inbound_whatsapp_message,
-                            sender_phone=sender_phone,
-                            message_text=text_body,
-                            message_id=message_id,
-                        )
+                text_body = ""
+                if msg_type == "text":
+                    text_obj = msg.get("text")
+                    if isinstance(text_obj, dict):
+                        text_body = text_obj.get("body", "").strip()
+                    elif isinstance(text_obj, str):
+                        text_body = text_obj.strip()
+                elif msg_type == "interactive":
+                    interactive = msg.get("interactive", {})
+                    if isinstance(interactive, dict):
+                        btn_reply = interactive.get("button_reply", {})
+                        list_reply = interactive.get("list_reply", {})
+                        if isinstance(btn_reply, dict) and btn_reply.get("title"):
+                            text_body = btn_reply.get("title", "").strip()
+                        elif isinstance(list_reply, dict) and list_reply.get("title"):
+                            text_body = list_reply.get("title", "").strip()
+                elif msg_type in ("button", "response"):
+                    button_obj = msg.get("button", {})
+                    if isinstance(button_obj, dict):
+                        text_body = button_obj.get("text", "").strip()
+
+                if sender_phone and text_body:
+                    logger.info(f"📥 [WhatsApp Webhook Enqueue] Scheduling background task for {sender_phone}")
+                    # Enqueue background task so Meta receives immediate HTTP 200
+                    background_tasks.add_task(
+                        handle_inbound_whatsapp_message,
+                        sender_phone=sender_phone,
+                        message_text=text_body,
+                        message_id=message_id,
+                    )
 
     # Immediately acknowledge Meta with 200 OK (< 3 second SLA requirement)
     return {"status": "EVENT_RECEIVED"}
-
