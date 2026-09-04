@@ -24,6 +24,9 @@ class CartSession(Base):
     is_recovered = Column(Boolean, default=False, nullable=False)
     recovery_sent = Column(Boolean, default=False, nullable=False)
     recovery_sent_at = Column(DateTime, nullable=True)
+    status = Column(String(50), default="pending", nullable=True)
+    customer_response_at = Column(DateTime, nullable=True)
+    last_customer_message = Column(String(1000), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=True)
 
@@ -43,7 +46,11 @@ class CartSession(Base):
             "is_recovered": self.is_recovered,
             "recovery_sent": self.recovery_sent,
             "recovery_sent_at": self.recovery_sent_at.isoformat() if self.recovery_sent_at else None,
+            "status": self.status or ("recovered" if self.is_recovered else ("sent" if self.recovery_sent else "pending")),
+            "customer_response_at": self.customer_response_at.isoformat() if self.customer_response_at else None,
+            "last_customer_message": self.last_customer_message,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": (self.updated_at or self.created_at).isoformat() if (self.updated_at or self.created_at) else None,
         }
+
 

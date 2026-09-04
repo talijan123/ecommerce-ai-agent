@@ -314,3 +314,63 @@ def process_abandoned_cart_recoveries(
     finally:
         if should_close:
             db.close()
+
+
+def track_cart_engagement(
+    sender_phone: str,
+    message_text: Optional[str] = None,
+    db: Optional[Session] = None,
+) -> Optional[CartSession]:
+    """
+    Session Engagement Tracking:
+    Finds the most recent CartSession matching customer_phone == sender_phone,
+    marks its status as 'engaged', records the customer response timestamp, and persists
+    the customer's message.
+    """
+    from app.core.database import SessionLocal
+    from sqlalchemy import or_
+
+    if not sender_phone:
+        return None
+
+    # Normalize phone: extract digits
+    digits_only = "".join(c for c in str(sender_phone) if c.isdigit())
+    if not digits_only:
+        return None
+
+    should_close = False
+    if db is None:
+        db = SessionLocal()
+        should_close = True
+
+    try:
+        # Search matching CartSession by phone variants
+        cart = db.query(CartSession).filter(
+            or_(
+                CartSession.customer_phone == sender_phone,
+                CartSession.customer_phone == f"+{digits_only}",
+                CartSession.customer_phone == digits_only,
+                CartSession.customer_phone.like(f"%{digits_only[-9:]}"),
+            )
+        ).order_by(CartSession.created_at.desc()).first()
+
+        if cart:
+            cart.status = "engaged"
+            cart.customer_response_at = datetime.now(timezone.utc)
+            cart.updated_at = datetime.now(timezone.utc)
+            if message_text:
+                cart.last_customer_message = message_text[:1000]
+            db.commit()
+            db.refresh(cart)
+            logger.info(f"🎯 [CartRecovery] CartSession '{cart.session_id}' status updated to 'engaged' for {sender_phone}")
+            return cart
+        else:
+            logger.info(f"ℹ️ [CartRecovery] No existing CartSession found for phone {sender_phone}")
+            return None
+    except Exception as e:
+        logger.error(f"❌ [CartRecovery] Error tracking cart engagement for {sender_phone}: {e}", exc_info=True)
+        return None
+    finally:
+        if should_close:
+            db.close()
+

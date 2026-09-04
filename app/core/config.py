@@ -19,12 +19,15 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
 
-    # LLM Provider Settings (Groq / OpenAI / Any OpenAI-compatible provider)
+    # LLM Provider Settings (Groq / OpenAI / Gemini / Any OpenAI-compatible provider)
     GROQ_API_KEY: str = Field(default="")
     OPENAI_API_KEY: str = Field(default="")
+    GEMINI_API_KEY: str = Field(default="")
+    GOOGLE_API_KEY: str = Field(default="")
     LLM_BASE_URL: str = Field(default="https://api.groq.com/openai/v1")
     LLM_MODEL: str = Field(default="llama-3.3-70b-versatile")
     OPENAI_MODEL: str = Field(default="gpt-4o-mini")
+    GEMINI_MODEL: str = Field(default="gemini-2.5-flash")
 
     # Meta WhatsApp Cloud API Settings
     WHATSAPP_TOKEN: str = Field(default="")

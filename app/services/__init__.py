@@ -12,7 +12,9 @@ from app.services.cart_recovery import (
     cart_recovery_service,
     dispatch_cart_recovery,
     process_abandoned_cart_recoveries,
+    track_cart_engagement,
 )
+from app.services.ai_support_service import AISupportService, ai_support_service
 
 __all__ = [
     "OrderService",
@@ -25,5 +27,9 @@ __all__ = [
     "cart_recovery_service",
     "dispatch_cart_recovery",
     "process_abandoned_cart_recoveries",
+    "track_cart_engagement",
+    "AISupportService",
+    "ai_support_service",
 ]
+
 

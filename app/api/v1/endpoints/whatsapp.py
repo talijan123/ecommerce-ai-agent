@@ -1,53 +1,66 @@
-"""
-Meta WhatsApp Cloud API Webhook Endpoints.
-Handles verification handshake (GET) and real-time incoming customer messages (POST).
-"""
-
 import logging
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Request, Response, Query, BackgroundTasks, status
 from app.core.config import settings
 from app.core.database import SessionLocal
-from app.core.agent import run_agent_turn
+from app.services.cart_recovery import track_cart_engagement
+from app.services.ai_support_service import ai_support_service
 from app.services.whatsapp_service import whatsapp_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def process_whatsapp_inbound_message(sender_phone: str, message_id: str, message_text: str):
+async def handle_inbound_whatsapp_message(
+    sender_phone: str,
+    message_text: str,
+    message_id: Optional[str] = None,
+):
     """
-    Background worker that runs the autonomous AI agent loop against the database
-    and sends the synthesized response back to the customer's WhatsApp number.
+    Intelligent Inbound Message Processor:
+    1. Tracks and updates CartSession engagement in database (status='engaged', response timestamp).
+    2. Generates a contextual AI customer support reply via Gemini AI.
+    3. Dispatches reply to customer's WhatsApp number via Meta Cloud API.
+    4. Marks incoming message as read.
     """
     db = SessionLocal()
     try:
-        session_id = f"wa_{sender_phone}"
-        logger.info(f"📩 [WhatsApp Inbound] From: {sender_phone} | Query: '{message_text}' | Session: {session_id}")
+        logger.info(f"📩 [WhatsApp Inbound] Received message from: {sender_phone} | Query: '{message_text}'")
 
-        # Execute Autonomous AI Agent turn
-        response_text, tools_invoked, success = run_agent_turn(
+        # 1. Update CartSession engagement in DB
+        cart = track_cart_engagement(
+            sender_phone=sender_phone,
+            message_text=message_text,
             db=db,
-            session_id=session_id,
-            user_message=message_text,
         )
 
-        logger.info(f"🤖 [WhatsApp AI Response]: '{response_text[:100]}...' | Tools Invoked: {[t['tool_name'] for t in tools_invoked]}")
+        # 2. Generate contextual AI support reply using Gemini
+        ai_reply = ai_support_service.generate_support_reply(
+            customer_message=message_text,
+            cart_session=cart,
+            customer_phone=sender_phone,
+        )
+        logger.info(f"🤖 [WhatsApp AI Reply to {sender_phone}]: '{ai_reply}'")
 
-        # Send reply back to customer on WhatsApp
-        await whatsapp_service.send_text_message(
+        # 3. Dispatch outbound reply message to WhatsApp
+        dispatch_result = await whatsapp_service.send_text_message(
             to_phone_number=sender_phone,
-            message_text=response_text,
+            message_text=ai_reply,
         )
+        logger.info(f"📤 [WhatsApp Outbound Dispatch Result]: {dispatch_result}")
 
-        # Mark incoming message as read
+        # 4. Mark incoming message as read
         if message_id:
             await whatsapp_service.mark_message_as_read(message_id)
 
     except Exception as e:
-        logger.error(f"❌ Error processing WhatsApp message: {str(e)}", exc_info=True)
+        logger.error(f"❌ Error handling inbound WhatsApp message from {sender_phone}: {e}", exc_info=True)
     finally:
         db.close()
+
+
+# Alias for backward compatibility with existing tests
+process_whatsapp_inbound_message = handle_inbound_whatsapp_message
 
 
 @router.get(
@@ -77,7 +90,7 @@ def verify_whatsapp_webhook(
 @router.post(
     "/webhooks/whatsapp",
     summary="Receive WhatsApp Webhook Events",
-    description="Ingests incoming customer WhatsApp messages, routes them to the AI agent, and replies via Meta Graph API."
+    description="Ingests incoming customer WhatsApp messages, tracks engagement, and triggers Gemini AI contextual replies."
 )
 async def receive_whatsapp_webhook(
     request: Request,
@@ -85,18 +98,18 @@ async def receive_whatsapp_webhook(
 ):
     """
     Receives real-time events from Meta WhatsApp Cloud API.
-    Acknowledge with HTTP 200 immediately and process the AI turn in the background.
+    Acknowledge with HTTP 200 immediately and process the engagement tracking and AI reply in the background.
     """
     try:
         payload: Dict[str, Any] = await request.json()
     except Exception:
         # Return 200 even on unparseable payloads so Meta does not disable the webhook
-        return {"status": "ignored", "reason": "invalid_json"}
+        return {"status": "EVENT_RECEIVED", "reason": "invalid_json"}
 
     # Validate payload structure
     entry_list = payload.get("entry", [])
     if not entry_list:
-        return {"status": "ok"}
+        return {"status": "EVENT_RECEIVED"}
 
     for entry in entry_list:
         changes = entry.get("changes", [])
@@ -118,13 +131,14 @@ async def receive_whatsapp_webhook(
                 if msg_type == "text" and sender_phone:
                     text_body = msg.get("text", {}).get("body", "").strip()
                     if text_body:
-                        # Dispatch agent processing to BackgroundTasks
+                        # Queue background task for engagement tracking and Gemini reply
                         background_tasks.add_task(
-                            process_whatsapp_inbound_message,
+                            handle_inbound_whatsapp_message,
                             sender_phone=sender_phone,
-                            message_id=message_id,
                             message_text=text_body,
+                            message_id=message_id,
                         )
 
     # Immediately acknowledge Meta with 200 OK (< 3 second SLA requirement)
-    return {"status": "ok"}
+    return {"status": "EVENT_RECEIVED"}
+
