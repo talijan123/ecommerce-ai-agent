@@ -129,6 +129,7 @@ ORDERS: List[Dict[str, Any]] = [
     {
         "order_id": "1042",
         "customer_name": "Hamza Tariq",
+        "customer_phone": "+923187806306",
         "status": "Shipped",
         "tracking_number": "TRK-FEDEX-984210",
         "tracking_url": "https://tracking.carrier.com/track/TRK-FEDEX-984210",
@@ -145,6 +146,7 @@ ORDERS: List[Dict[str, Any]] = [
     {
         "order_id": "1043",
         "customer_name": "Ali Khan",
+        "customer_phone": "+923001234567",
         "status": "Processing",
         "tracking_number": "PENDING-LABEL-GEN",
         "tracking_url": None,
@@ -160,6 +162,7 @@ ORDERS: List[Dict[str, Any]] = [
     {
         "order_id": "1044",
         "customer_name": "Sarah Miller",
+        "customer_phone": "+14155552671",
         "status": "Delivered",
         "tracking_number": "TRK-UPS-772911",
         "tracking_url": "https://tracking.carrier.com/track/TRK-UPS-772911",
@@ -175,6 +178,7 @@ ORDERS: List[Dict[str, Any]] = [
     {
         "order_id": "1045",
         "customer_name": "Zubair Ahmed",
+        "customer_phone": "+923219876543",
         "status": "Cancelled",
         "tracking_number": None,
         "tracking_url": None,

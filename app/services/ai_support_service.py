@@ -71,6 +71,29 @@ class AISupportService:
                 except Exception:
                     pass
 
+        # Check if customer message contains an order reference
+        order_match = re.search(r"(?:order\s*#?|#)([A-Za-z0-9-]+)", customer_message, re.IGNORECASE)
+        if order_match:
+            try:
+                from app.services.ecommerce_service import ecommerce_service
+                order_num = order_match.group(1).strip()
+                if order_num:
+                    order_res = ecommerce_service.get_order_by_number(order_num, phone=customer_phone)
+                    if order_res.get("success"):
+                        context_parts.append(
+                            f"Verified Order #{order_res.get('order_id')} Status: {order_res.get('status')}, "
+                            f"Carrier: {order_res.get('carrier') or 'N/A'}, "
+                            f"Tracking: {order_res.get('tracking_number') or 'Pending'}, "
+                            f"Estimated Delivery: {order_res.get('estimated_delivery') or '2-4 business days'}"
+                        )
+                    elif order_res.get("security_error"):
+                        context_parts.append(
+                            f"Order #{order_num} Security Warning: Customer phone ({customer_phone}) does not match order phone. "
+                            "Do NOT share order details. Politely ask customer to contact support from their registered phone number."
+                        )
+            except Exception as e:
+                logger.warning(f"Error checking order in prompt context: {e}")
+
         if context_parts:
             context_header = "Customer Store Context:\n" + "\n".join(f"- {c}" for c in context_parts)
             return f"{context_header}\n\nCustomer WhatsApp Message:\n\"{customer_message}\"\n\nReply (1-3 sentences, match language):"

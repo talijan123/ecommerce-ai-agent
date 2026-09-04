@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     WHATSAPP_VERIFY_TOKEN: str = Field(default="autocommerce_wa_verify_token_123")
     WHATSAPP_API_VERSION: str = Field(default="v21.0")
 
+    # Shopify Store API Settings (Live E-Commerce Integration)
+    SHOPIFY_STORE_URL: str = Field(default="")
+    SHOPIFY_ACCESS_TOKEN: str = Field(default="")
+    SHOPIFY_API_VERSION: str = Field(default="2024-01")
+
     # Abandoned Cart Background Worker & Recovery Settings
     RECOVERY_CRON_INTERVAL_MINUTES: int = Field(default=15)
     RECOVERY_ABANDON_THRESHOLD_MINUTES: int = Field(default=30)

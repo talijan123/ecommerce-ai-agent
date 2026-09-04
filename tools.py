@@ -7,46 +7,23 @@ their corresponding OpenAI Tool Schemas (tools / tool_calls format).
 import re
 from typing import List, Dict, Any, Optional
 from mock_data import PRODUCTS, ORDERS, CART_SESSIONS
+from app.services.ecommerce_service import ecommerce_service
 
 
-def get_order_status(order_id: str) -> Dict[str, Any]:
+def get_order_status(order_id: str, phone: Optional[str] = None) -> Dict[str, Any]:
     """
     Retrieve real-time status and shipping details for a customer order by its Order ID.
+    Enforces phone verification check when customer phone is provided.
 
     Args:
         order_id: The unique identifier of the order (e.g., '1042', '#1043').
+        phone: Optional customer phone number for security authorization.
 
     Returns:
         A dictionary containing order status, items, carrier, tracking information,
-        and estimated delivery date, or an error message if not found.
+        and estimated delivery date, or an error/security message.
     """
-    # Clean up order_id (remove '#' or common prefixes)
-    cleaned_id = re.sub(r"[^\w-]", "", order_id).lstrip("#").strip()
-
-    # Search for matching order
-    for order in ORDERS:
-        if order["order_id"].lower() == cleaned_id.lower():
-            return {
-                "success": True,
-                "order_id": order["order_id"],
-                "customer_name": order["customer_name"],
-                "status": order["status"],
-                "carrier": order.get("carrier"),
-                "tracking_number": order.get("tracking_number"),
-                "tracking_url": order.get("tracking_url"),
-                "estimated_delivery": order.get("estimated_delivery"),
-                "order_date": order.get("order_date"),
-                "items": order.get("items", []),
-                "total_amount": order.get("total_amount"),
-                "shipping_address": order.get("shipping_address"),
-                "cancellation_reason": order.get("cancellation_reason"),
-            }
-
-    return {
-        "success": False,
-        "error": f"Order ID '{order_id}' was not found in our database. Please verify the order number and try again.",
-        "suggested_action": "Ask customer to verify their order number or the email associated with the order."
-    }
+    return ecommerce_service.get_order_by_number(order_id=order_id, phone=phone)
 
 
 def check_product_inventory(product_name: str, size: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -62,92 +39,7 @@ def check_product_inventory(product_name: str, size: Optional[str] = None) -> Li
         A list of matching product variant objects containing inventory count, price,
         availability status, and alternatives if out of stock.
     """
-    query_lower = product_name.lower().strip()
-    
-    # Match products by name containing the query or category
-    matching_products = [
-        p for p in PRODUCTS
-        if query_lower in p["name"].lower() or query_lower in p["category"].lower()
-    ]
-
-    if not matching_products:
-        # Check token-based similarity if exact substring fails
-        query_words = set(query_lower.split())
-        matching_products = [
-            p for p in PRODUCTS
-            if any(word in p["name"].lower().split() for word in query_words)
-        ]
-
-    if not matching_products:
-        return [{
-            "success": False,
-            "query": product_name,
-            "message": f"No products found matching '{product_name}'.",
-            "available_categories": list({p['category'] for p in PRODUCTS}),
-        }]
-
-    results: List[Dict[str, Any]] = []
-    
-    # If size is specified, check the specific size and list alternative sizes
-    if size:
-        cleaned_size = size.strip().upper()
-        
-        # Filter for requested size among matching products
-        exact_size_matches = [
-            p for p in matching_products
-            if str(p.get("size", "")).upper() == cleaned_size
-        ]
-        
-        # Find all other sizes available in stock for the same product name(s)
-        available_other_sizes = [
-            {"size": p["size"], "stock_count": p["stock_count"], "price": p["price"]}
-            for p in matching_products
-            if str(p.get("size", "")).upper() != cleaned_size and p["stock_count"] > 0
-        ]
-
-        if exact_size_matches:
-            for item in exact_size_matches:
-                is_in_stock = item["stock_count"] > 0
-                results.append({
-                    "product_id": item["id"],
-                    "product_name": item["name"],
-                    "category": item["category"],
-                    "requested_size": item["size"],
-                    "in_stock": is_in_stock,
-                    "stock_count": item["stock_count"],
-                    "price": item["price"],
-                    "description": item["description"],
-                    "alternative_available_sizes": available_other_sizes if not is_in_stock else [],
-                    "note": "Item in requested size is currently OUT OF STOCK." if not is_in_stock else "Item is available."
-                })
-        else:
-            # Size not found for this product
-            all_sizes_for_prod = [
-                {"size": p["size"], "stock_count": p["stock_count"], "in_stock": p["stock_count"] > 0}
-                for p in matching_products
-            ]
-            results.append({
-                "product_name": matching_products[0]["name"],
-                "requested_size": size,
-                "in_stock": False,
-                "message": f"Size '{size}' is not offered or not found for {matching_products[0]['name']}.",
-                "available_variants": all_sizes_for_prod,
-            })
-    else:
-        # Return all variants matching the product name
-        for item in matching_products:
-            results.append({
-                "product_id": item["id"],
-                "product_name": item["name"],
-                "category": item["category"],
-                "size": item.get("size"),
-                "in_stock": item["stock_count"] > 0,
-                "stock_count": item["stock_count"],
-                "price": item["price"],
-                "description": item["description"],
-            })
-
-    return results
+    return ecommerce_service.get_product_stock(query=product_name, size=size)
 
 
 def apply_cart_recovery_discount(customer_email: str) -> Dict[str, Any]:
@@ -208,6 +100,10 @@ OPENAI_TOOLS: List[Dict[str, Any]] = [
                     "order_id": {
                         "type": "string",
                         "description": "The unique order ID number provided by the customer (e.g., '1042', '#1043')."
+                    },
+                    "phone": {
+                        "type": "string",
+                        "description": "Optional customer phone number to verify authorization before returning order details."
                     }
                 },
                 "required": ["order_id"]
