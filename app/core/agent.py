@@ -98,7 +98,7 @@ def run_agent_turn(
     while turn < max_turns:
         turn += 1
 
-        model_name = settings.LLM_MODEL or "llama-3.3-70b-versatile"
+        model_name = settings.LLM_MODEL or "openai/gpt-oss-120b"
         try:
             response = client.chat.completions.create(
                 model=model_name,
