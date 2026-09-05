@@ -7,6 +7,14 @@ from app.schemas.product import ProductCreate, ProductResponse
 from app.schemas.order import OrderCreate, OrderResponse
 from app.schemas.webhook import OrderWebhookPayload, InventoryWebhookPayload, WebhookResponse
 from app.schemas.store import StoreCreate, StoreUpdate, StoreResponse
+from app.schemas.auth import (
+    UserSignupRequest,
+    UserVerifyEmailRequest,
+    UserLoginRequest,
+    UserResponse,
+    TokenResponse,
+    SignupResponse,
+)
 
 __all__ = [
     "ChatRequest",
@@ -23,4 +31,10 @@ __all__ = [
     "StoreCreate",
     "StoreUpdate",
     "StoreResponse",
+    "UserSignupRequest",
+    "UserVerifyEmailRequest",
+    "UserLoginRequest",
+    "UserResponse",
+    "TokenResponse",
+    "SignupResponse",
 ]

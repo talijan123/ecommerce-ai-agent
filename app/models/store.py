@@ -6,7 +6,7 @@ Stores merchant credentials, WhatsApp phone number IDs, and custom bot instructi
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
-from sqlalchemy import Column, String, Text, Boolean, DateTime, Uuid
+from sqlalchemy import Column, String, Text, Boolean, DateTime, Uuid, ForeignKey
 from app.core.database import Base
 
 
@@ -14,6 +14,7 @@ class Store(Base):
     __tablename__ = "stores"
 
     id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    owner_id = Column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
     name = Column(String(255), nullable=False)
     owner_email = Column(String(255), nullable=False, index=True)
     whatsapp_phone_number_id = Column(String(100), unique=True, index=True, nullable=False)
@@ -31,6 +32,7 @@ class Store(Base):
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": str(self.id) if self.id else None,
+            "owner_id": str(self.owner_id) if self.owner_id else None,
             "name": self.name,
             "owner_email": self.owner_email,
             "whatsapp_phone_number_id": self.whatsapp_phone_number_id,

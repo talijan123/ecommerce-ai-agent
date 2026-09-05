@@ -1,24 +1,27 @@
 """
 Store Onboarding and Multi-Tenant Management Endpoints (/api/v1/stores).
-Provides CRUD endpoints for merchant onboarding, WhatsApp credential updates,
-custom prompt configuration, and bot status toggles.
+Provides secure CRUD endpoints for merchant onboarding, WhatsApp credential updates,
+custom prompt configuration, and bot status toggles protected by JWT User Authentication.
 """
 
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.security import get_current_user
 from app.models.store import Store
+from app.models.user import User
 from app.schemas.store import StoreCreate, StoreUpdate, StoreResponse
 
 router = APIRouter()
 
 
-def _get_store_or_404(store_id: str, db: Session) -> Store:
-    """Helper to resolve Store model by UUID string or 404."""
+def _get_user_store_or_404(store_id: str, db: Session, current_user: User) -> Store:
+    """Helper to resolve Store model by UUID string and verify ownership."""
     try:
         parsed_id = uuid.UUID(str(store_id))
     except (ValueError, AttributeError):
@@ -27,11 +30,18 @@ def _get_store_or_404(store_id: str, db: Session) -> Store:
             detail=f"Invalid store ID format '{store_id}'. Must be a valid UUID.",
         )
 
-    store = db.query(Store).filter(Store.id == parsed_id).first()
+    store = (
+        db.query(Store)
+        .filter(
+            Store.id == parsed_id,
+            or_(Store.owner_id == current_user.id, Store.owner_email == current_user.email),
+        )
+        .first()
+    )
     if not store:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Store with ID '{store_id}' not found.",
+            detail=f"Store with ID '{store_id}' not found or access denied.",
         )
     return store
 
@@ -44,17 +54,19 @@ def _get_store_or_404(store_id: str, db: Session) -> Store:
 )
 def create_store(
     payload: StoreCreate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Onboard a new store tenant:
+    Onboard a new store tenant for the authenticated user:
     - Verifies WhatsApp Phone Number ID uniqueness.
-    - Saves store credentials, owner email, and custom AI prompt instructions.
+    - Sets owner_id and owner_email from authenticated user.
+    - Saves store credentials and custom AI prompt instructions.
     - Returns 201 Created with masked credentials.
     """
     clean_phone_id = str(payload.whatsapp_phone_number_id).strip()
 
-    # Check for duplicate phone number ID
+    # Check for duplicate phone number ID across the platform
     existing = db.query(Store).filter(Store.whatsapp_phone_number_id == clean_phone_id).first()
     if existing:
         raise HTTPException(
@@ -64,8 +76,9 @@ def create_store(
 
     new_store = Store(
         id=uuid.uuid4(),
+        owner_id=current_user.id,
         name=payload.name.strip(),
-        owner_email=payload.owner_email.strip().lower(),
+        owner_email=current_user.email,
         whatsapp_phone_number_id=clean_phone_id,
         whatsapp_access_token=payload.whatsapp_access_token.strip(),
         system_prompt=payload.system_prompt,
@@ -82,18 +95,21 @@ def create_store(
 @router.get(
     "",
     response_model=List[StoreResponse],
-    summary="List all merchant store tenants",
+    summary="List all merchant store tenants owned by current user",
 )
 def list_stores(
     skip: int = Query(0, ge=0, description="Pagination skip offset"),
     limit: int = Query(50, ge=1, le=200, description="Pagination page limit"),
     is_active: Optional[bool] = Query(None, description="Filter by active/inactive status"),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    List all store tenants with optional pagination and active-status filtering.
+    List all store tenants owned by the authenticated merchant with optional pagination and active-status filtering.
     """
-    query = db.query(Store)
+    query = db.query(Store).filter(
+        or_(Store.owner_id == current_user.id, Store.owner_email == current_user.email)
+    )
     if is_active is not None:
         query = query.filter(Store.is_active == is_active)
 
@@ -108,12 +124,13 @@ def list_stores(
 )
 def get_store(
     store_id: str,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Retrieve specific store details by UUID.
+    Retrieve specific store details by UUID (restricted to store owner).
     """
-    return _get_store_or_404(store_id, db)
+    return _get_user_store_or_404(store_id, db, current_user)
 
 
 @router.patch(
@@ -124,12 +141,13 @@ def get_store(
 def update_store(
     store_id: str,
     payload: StoreUpdate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Update store name, AI system prompt, WhatsApp token, or active status.
+    Update store name, AI system prompt, WhatsApp token, or active status (restricted to store owner).
     """
-    store = _get_store_or_404(store_id, db)
+    store = _get_user_store_or_404(store_id, db, current_user)
 
     update_data = payload.model_dump(exclude_unset=True)
     if not update_data:
@@ -137,8 +155,6 @@ def update_store(
 
     if "name" in update_data and update_data["name"] is not None:
         store.name = update_data["name"].strip()
-    if "owner_email" in update_data and update_data["owner_email"] is not None:
-        store.owner_email = update_data["owner_email"].strip().lower()
     if "system_prompt" in update_data and update_data["system_prompt"] is not None:
         store.system_prompt = update_data["system_prompt"]
     if "whatsapp_access_token" in update_data and update_data["whatsapp_access_token"] is not None:
@@ -159,12 +175,13 @@ def update_store(
 )
 def delete_store(
     store_id: str,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Soft deletes / deactivates a store tenant by setting `is_active = False`.
+    Soft deletes / deactivates a store tenant by setting `is_active = False` (restricted to store owner).
     """
-    store = _get_store_or_404(store_id, db)
+    store = _get_user_store_or_404(store_id, db, current_user)
     store.is_active = False
     store.updated_at = datetime.now(timezone.utc)
     db.commit()

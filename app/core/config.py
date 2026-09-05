@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
 
+    # JWT & Auth Security Settings
+    SECRET_KEY: str = Field(default="super_secret_jwt_key_ecom_saas_auth_2026_x99!#")
+    ALGORITHM: str = Field(default="HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=10080)  # 7 days
+
     # LLM Provider Settings (Groq / OpenAI / Gemini / Any OpenAI-compatible provider)
     GROQ_API_KEY: str = Field(default="")
     OPENAI_API_KEY: str = Field(default="")
