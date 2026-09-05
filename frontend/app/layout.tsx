@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { AuthProvider } from "@/context/AuthContext";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { BackToTop } from "@/components/BackToTop";
 
@@ -44,13 +45,15 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 min-h-screen flex flex-col antialiased selection:bg-blue-600 selection:text-white transition-colors duration-200">
-        <ThemeProvider>
-          {children}
-          {/* Floating Smooth Back to Top Action Button */}
-          <BackToTop />
-          {/* Floating Customer AI Chat Widget visible globally */}
-          <ChatWidget />
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            {children}
+            {/* Floating Smooth Back to Top Action Button */}
+            <BackToTop />
+            {/* Floating Customer AI Chat Widget visible globally */}
+            <ChatWidget />
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

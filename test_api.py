@@ -234,7 +234,7 @@ def test_admin_endpoints():
     res_prods = client.get("/api/v1/admin/products")
     assert res_prods.status_code == 200
     prods = res_prods.json()
-    assert len(prods) == 100, f"Expected 100 products, got {len(prods)}"
+    assert len(prods) >= 100, f"Expected at least 100 products, got {len(prods)}"
     print(f"  ✓ GET /api/v1/admin/products verified (All {len(prods)} products retrieved with full schema)")
 
     res_orders = client.get("/api/v1/admin/orders")

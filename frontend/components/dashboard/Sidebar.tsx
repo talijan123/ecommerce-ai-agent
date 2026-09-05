@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -11,12 +11,13 @@ import {
   Store,
   ExternalLink,
   Bot,
-  Activity,
+  LogOut,
+  User,
   ShieldCheck,
-  Zap,
+  CheckCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { useAuth } from "@/context/AuthContext";
 
 const NAV_ITEMS = [
   {
@@ -39,6 +40,13 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
 
   return (
     <aside className="w-64 border-r border-zinc-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xl flex flex-col h-screen sticky top-0 z-20 transition-colors">
@@ -117,16 +125,62 @@ export function Sidebar() {
         </div>
       </nav>
 
+      {/* Authenticated User Profile & Logout Section */}
+      <div className="p-3 border-t border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-900/50">
+        {user ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-sm">
+              <div className="h-8 w-8 rounded-lg gradient-blue-indigo flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-sm">
+                {(user.full_name || user.email).charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1">
+                  <p className="text-xs font-bold text-zinc-900 dark:text-white truncate">
+                    {user.full_name || "Merchant"}
+                  </p>
+                  {user.is_verified && (
+                    <span title="Verified Merchant" className="inline-flex items-center">
+                      <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0" />
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate font-mono">
+                  {user.email}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Sign Out</span>
+            </button>
+          </div>
+        ) : (
+          <Link
+            href="/login"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-white gradient-blue-indigo shadow-sm"
+          >
+            <User className="h-3.5 w-3.5" />
+            <span>Sign In</span>
+          </Link>
+        )}
+      </div>
+
       {/* Backend Engine Status Footer */}
-      <div className="p-3.5 border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50 dark:bg-zinc-900/60 m-3 rounded-2xl">
-        <div className="flex items-center gap-2 mb-1">
+      <div className="p-3 border-t border-zinc-200 dark:border-zinc-800/80 bg-zinc-50 dark:bg-zinc-900/60 m-2 rounded-xl">
+        <div className="flex items-center gap-2 mb-0.5">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
-          <span className="text-xs font-bold text-zinc-900 dark:text-white">FastAPI AI Engine</span>
+          <span className="text-[11px] font-bold text-zinc-900 dark:text-white">FastAPI AI Engine</span>
         </div>
-        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-tight">Grounded Function Calling & Live Supabase Sync</p>
+        <p className="text-[9px] text-zinc-500 dark:text-zinc-400 leading-tight">
+          Grounded Multi-Tenant Sync
+        </p>
       </div>
     </aside>
   );

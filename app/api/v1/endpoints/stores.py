@@ -96,15 +96,17 @@ def create_store(
     - Saves store credentials and custom AI prompt instructions.
     - Returns 201 Created with masked credentials.
     """
-    clean_phone_id = str(payload.whatsapp_phone_number_id).strip()
-
-    # Check for duplicate phone number ID across the platform
-    existing = db.query(Store).filter(Store.whatsapp_phone_number_id == clean_phone_id).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Store with WhatsApp Phone Number ID '{clean_phone_id}' is already registered (Store ID: {existing.id}).",
-        )
+    # If phone number ID is provided, verify uniqueness; otherwise generate temporary pending ID
+    if payload.whatsapp_phone_number_id and payload.whatsapp_phone_number_id.strip():
+        clean_phone_id = payload.whatsapp_phone_number_id.strip()
+        existing = db.query(Store).filter(Store.whatsapp_phone_number_id == clean_phone_id).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Store with WhatsApp Phone Number ID '{clean_phone_id}' is already registered (Store ID: {existing.id}).",
+            )
+    else:
+        clean_phone_id = f"pending-{uuid.uuid4().hex[:10]}"
 
     new_store = Store(
         id=uuid.uuid4(),
@@ -112,7 +114,7 @@ def create_store(
         name=payload.name.strip(),
         owner_email=current_user.email,
         whatsapp_phone_number_id=clean_phone_id,
-        whatsapp_access_token=payload.whatsapp_access_token.strip(),
+        whatsapp_access_token=payload.whatsapp_access_token.strip() if payload.whatsapp_access_token else None,
         system_prompt=payload.system_prompt,
         is_active=True,
     )
@@ -250,6 +252,32 @@ def delete_store(
         "store_id": str(store.id),
         "is_active": False,
     }
+
+
+@router.get(
+    "/{store_id}/products",
+    summary="List all products belonging to a specific store tenant",
+)
+def list_store_products(
+    store_id: str,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    List all catalog products associated with the merchant's store tenant.
+    """
+    store = _get_user_store_or_404(store_id, db, current_user)
+    products = (
+        db.query(Product)
+        .filter(Product.store_id == store.id)
+        .order_by(Product.id.asc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return [p.to_dict() for p in products]
 
 
 @router.post(

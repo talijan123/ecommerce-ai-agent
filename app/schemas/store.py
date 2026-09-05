@@ -10,9 +10,9 @@ from pydantic import BaseModel, EmailStr, Field, ConfigDict, model_validator
 
 class StoreBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=255, description="Store or merchant display name")
-    owner_email: EmailStr = Field(..., description="Store owner's contact email")
-    whatsapp_phone_number_id: str = Field(
-        ..., min_length=1, max_length=100, description="Unique Meta WhatsApp Phone Number ID"
+    owner_email: Optional[EmailStr] = Field(default=None, description="Store owner's contact email")
+    whatsapp_phone_number_id: Optional[str] = Field(
+        default=None, max_length=100, description="Unique Meta WhatsApp Phone Number ID"
     )
     system_prompt: Optional[str] = Field(
         default="You are a professional e-commerce AI assistant. Help customers track orders and check product inventory accurately.",
@@ -21,8 +21,8 @@ class StoreBase(BaseModel):
 
 
 class StoreCreate(StoreBase):
-    whatsapp_access_token: str = Field(
-        ..., min_length=1, description="Meta WhatsApp Cloud API system user access token"
+    whatsapp_access_token: Optional[str] = Field(
+        default=None, description="Meta WhatsApp Cloud API system user access token"
     )
 
 
