@@ -109,13 +109,13 @@ export interface WhatsAppSandboxInfo {
   is_configured: boolean;
 }
 
-export const DEFAULT_WHATSAPP_PHONE = process.env.NEXT_PUBLIC_DEFAULT_WHATSAPP_PHONE || "+15551433435";
-export const DEFAULT_WHATSAPP_CLEAN_PHONE = DEFAULT_WHATSAPP_PHONE.replace(/[^0-9]/g, "");
+export const DEFAULT_WHATSAPP_PHONE = process.env.NEXT_PUBLIC_DEFAULT_WHATSAPP_PHONE || "15556494898";
+export const DEFAULT_WHATSAPP_CLEAN_PHONE = DEFAULT_WHATSAPP_PHONE.replace(/\D/g, "");
 
 export function getSandboxConnectUrl(storeId: string, phone: string = DEFAULT_WHATSAPP_CLEAN_PHONE): string {
-  const clean = (phone || DEFAULT_WHATSAPP_CLEAN_PHONE).replace(/[^0-9]/g, "");
+  const cleanPhone = (phone || DEFAULT_WHATSAPP_CLEAN_PHONE).replace(/\D/g, "");
   const text = `CONNECT ${storeId}`;
-  return `https://wa.me/${clean}?text=${encodeURIComponent(text)}`;
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
 }
 
 export interface CSVImportSummary {

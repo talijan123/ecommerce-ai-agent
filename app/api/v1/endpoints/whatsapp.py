@@ -270,14 +270,14 @@ def get_whatsapp_sandbox_info():
     """
     Returns platform sandbox connection parameters for frictionless instant testing.
     """
-    raw_phone = settings.DEFAULT_WHATSAPP_PHONE or "+15551433435"
+    raw_phone = settings.DEFAULT_WHATSAPP_PHONE or "15556494898"
     clean_phone = "".join(c for c in raw_phone if c.isdigit())
     return {
         "sandbox_phone_number": raw_phone,
         "clean_phone_number": clean_phone,
         "connect_command_template": "CONNECT {store_id}",
         "active_sessions_count": len(SANDBOX_BINDINGS),
-        "is_configured": bool(settings.WHATSAPP_TOKEN and settings.WHATSAPP_PHONE_NUMBER_ID),
+        "is_configured": bool(settings.WHATSAPP_TOKEN and (settings.WHATSAPP_PHONE_NUMBER_ID or settings.META_PHONE_NUMBER_ID)),
     }
 
 
