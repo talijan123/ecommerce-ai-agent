@@ -1,10 +1,10 @@
 """
-Pydantic Schemas for Multi-Tenant Store Management and Onboarding.
+Pydantic Schemas for Multi-Tenant Store Management, Onboarding, CSV Ingestion, and WhatsApp Verification.
 """
 
 from uuid import UUID
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, model_validator
 
 
@@ -72,3 +72,15 @@ class StoreResponse(BaseModel):
             res.masked_access_token = None
 
         return res
+
+
+class WhatsAppVerifyRequest(BaseModel):
+    whatsapp_phone_number_id: Optional[str] = Field(None, description="Optional override phone number ID")
+    whatsapp_access_token: Optional[str] = Field(None, description="Optional override access token")
+
+
+class CSVImportSummary(BaseModel):
+    total_rows: int
+    imported: int
+    errors: List[str] = []
+    sample_imported: List[Dict[str, Any]] = []

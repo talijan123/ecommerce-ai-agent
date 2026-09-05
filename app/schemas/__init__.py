@@ -6,7 +6,7 @@ from app.schemas.chat import ChatRequest, ChatResponse, ChatHistoryItem, ToolInv
 from app.schemas.product import ProductCreate, ProductResponse
 from app.schemas.order import OrderCreate, OrderResponse
 from app.schemas.webhook import OrderWebhookPayload, InventoryWebhookPayload, WebhookResponse
-from app.schemas.store import StoreCreate, StoreUpdate, StoreResponse
+from app.schemas.store import StoreCreate, StoreUpdate, StoreResponse, WhatsAppVerifyRequest, CSVImportSummary
 from app.schemas.auth import (
     UserSignupRequest,
     UserVerifyEmailRequest,
@@ -31,6 +31,8 @@ __all__ = [
     "StoreCreate",
     "StoreUpdate",
     "StoreResponse",
+    "WhatsAppVerifyRequest",
+    "CSVImportSummary",
     "UserSignupRequest",
     "UserVerifyEmailRequest",
     "UserLoginRequest",
