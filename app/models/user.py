@@ -18,6 +18,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=True)
     is_verified = Column(Boolean, default=False, nullable=False)
+    role = Column(String(50), default="merchant", nullable=False)
     verification_token = Column(String(255), nullable=True, index=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
@@ -33,6 +34,7 @@ class User(Base):
             "id": str(self.id) if self.id else None,
             "email": self.email,
             "full_name": self.full_name,
+            "role": self.role or "merchant",
             "is_verified": self.is_verified,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": (self.updated_at or self.created_at).isoformat() if (self.updated_at or self.created_at) else None,

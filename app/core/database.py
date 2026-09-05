@@ -116,6 +116,7 @@ def create_db_and_tables():
                 conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS customer_response_at TIMESTAMP"))
                 conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS last_customer_message TEXT"))
                 # Multi-tenancy store_id column migrations
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'merchant'"))
                 conn.execute(text("ALTER TABLE stores ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES users(id)"))
                 conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id)"))
                 conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id)"))

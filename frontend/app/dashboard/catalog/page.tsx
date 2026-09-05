@@ -18,22 +18,35 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
+  ShoppingBag,
+  Store,
+  Upload,
 } from "lucide-react";
 import { Header } from "@/components/dashboard/Header";
 import { WebhookSimulator } from "@/components/dashboard/WebhookSimulator";
+import { ShopifyConnectModal } from "@/components/dashboard/ShopifyConnectModal";
+import { WooCommerceConnectModal } from "@/components/dashboard/WooCommerceConnectModal";
+import { CsvUploadModal } from "@/components/dashboard/CsvUploadModal";
 import { Card, Badge, Button } from "@/lib/ui";
-import { api, Product, Order } from "@/lib/api";
+import { api, Product, Order, StoreResponse } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getProductImage } from "@/lib/productImages";
 
 export default function CatalogAndOrdersPage() {
   const [activeTab, setActiveTab] = useState<"products" | "orders">("products");
+  const [stores, setStores] = useState<StoreResponse[]>([]);
+  const [activeStore, setActiveStore] = useState<StoreResponse | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Modals
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [isShopifyModalOpen, setIsShopifyModalOpen] = useState(false);
+  const [isWooCommerceModalOpen, setIsWooCommerceModalOpen] = useState(false);
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
 
   // New Product Form State
   const [newProduct, setNewProduct] = useState({
@@ -51,12 +64,21 @@ export default function CatalogAndOrdersPage() {
   async function loadData() {
     try {
       setLoading(true);
-      const [prods, ords] = await Promise.all([
-        api.getProducts(),
+      const [storesData, ords] = await Promise.all([
+        api.listStores().catch(() => []),
         api.getOrders().catch(() => []),
       ]);
-      setProducts(prods);
+      setStores(storesData);
       setOrders(ords);
+
+      if (storesData.length > 0) {
+        const store = activeStore || storesData[0];
+        setActiveStore(store);
+        const storeProds = await api.getStoreProducts(store.id).catch(() => []);
+        setProducts(storeProds);
+      } else {
+        setProducts([]);
+      }
     } catch (e) {
       console.error("Error loading catalog/orders:", e);
     } finally {
@@ -105,6 +127,7 @@ export default function CatalogAndOrdersPage() {
 
     const createdItem: Product = {
       id: Date.now(),
+      store_id: activeStore?.id,
       sku: newProduct.sku.toUpperCase(),
       title: newProduct.title,
       category: newProduct.category,
@@ -115,7 +138,7 @@ export default function CatalogAndOrdersPage() {
     };
 
     setProducts((prev) => [createdItem, ...prev]);
-    setFormSuccessMessage("Product catalog updated successfully! ✓");
+    setFormSuccessMessage("Product added to store catalog successfully! ✓");
 
     setTimeout(() => {
       setFormSuccessMessage(null);
@@ -137,7 +160,7 @@ export default function CatalogAndOrdersPage() {
     <div className="flex-1 flex flex-col min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white transition-colors">
       <Header
         title="Catalog & Fulfillment Hub"
-        description="Inspect store inventory, variant stock levels, carrier tracking, and product management."
+        description="Inspect store inventory, variant stock levels, direct store sync, and customer order management."
         onRefresh={loadData}
         onOpenSimulator={() => setIsSimulatorOpen(true)}
       />
@@ -172,8 +195,8 @@ export default function CatalogAndOrdersPage() {
           </div>
 
           {/* Search Input & Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-72">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
               <Search className="h-4 w-4 absolute left-3 top-2.5 text-zinc-400" />
               <input
                 type="text"
@@ -193,108 +216,177 @@ export default function CatalogAndOrdersPage() {
             </div>
 
             {activeTab === "products" && (
-              <Button
-                variant="gradient"
-                size="sm"
-                onClick={() => setIsAddProductOpen(true)}
-                className="shrink-0 gap-1.5 min-h-[40px] sm:min-h-[36px]"
-              >
-                <Plus className="h-4 w-4" />
-                Add Product
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsShopifyModalOpen(true)}
+                  className="gap-1.5 text-xs text-emerald-700 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 min-h-[38px] shrink-0 font-semibold"
+                >
+                  <ShoppingBag className="h-3.5 w-3.5" />
+                  <span>Shopify</span>
+                </Button>
+
+                <Button
+                  variant="gradient"
+                  size="sm"
+                  onClick={() => setIsAddProductOpen(true)}
+                  className="shrink-0 gap-1.5 min-h-[38px]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Product
+                </Button>
+              </div>
             )}
           </div>
         </div>
 
         {/* Tab 1: Products & Variants Table */}
         {activeTab === "products" && (
-          <Card className="p-0 overflow-hidden border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/60 shadow-xl">
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left text-xs min-w-[640px]">
-                <thead className="bg-zinc-100/90 dark:bg-zinc-900/90 border-b border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 font-semibold uppercase tracking-wider text-[10px]">
-                  <tr>
-                    <th className="p-4">SKU / Product Title</th>
-                    <th className="p-4">Category</th>
-                    <th className="p-4">Price</th>
-                    <th className="p-4">Total Stock</th>
-                    <th className="p-4">Size Variants Breakdown</th>
-                    <th className="p-4 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-zinc-500">
-                        Loading products from database...
-                      </td>
-                    </tr>
-                  ) : filteredProducts.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-zinc-500">
-                        No products match your search.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredProducts.map((p) => {
-                      const isLowStock = p.stock_quantity <= 5;
-                      const hasOutOfStockVariant = (p.size_variants || []).some((v) => v.stock === 0);
-                      const img = getProductImage(p.sku, p.category, p.title, p.image_url);
+          <>
+            {products.length === 0 && !loading ? (
+              /* Clean Empty State Card when tenant has 0 products */
+              <Card className="p-8 sm:p-12 text-center rounded-3xl border-dashed border-2 border-zinc-300 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/50 shadow-sm">
+                <div className="max-w-md mx-auto space-y-4">
+                  <div className="h-16 w-16 rounded-3xl gradient-blue-indigo flex items-center justify-center text-white mx-auto shadow-xl shadow-blue-500/20">
+                    <Package className="h-8 w-8" />
+                  </div>
 
-                      return (
-                        <tr key={p.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              <img
-                                src={img}
-                                alt={p.title}
-                                className="h-10 w-10 rounded-xl object-cover border border-zinc-200 dark:border-zinc-800 shrink-0"
-                              />
-                              <div>
-                                <div className="font-bold text-zinc-900 dark:text-white text-xs sm:text-sm">{p.title}</div>
-                                <span className="font-mono text-[10px] text-zinc-500 dark:text-zinc-400">{p.sku}</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <Badge variant="outline" className="text-[10px]">{p.category}</Badge>
-                          </td>
-                          <td className="p-4 font-black text-zinc-900 dark:text-white">{formatCurrency(p.price)}</td>
-                          <td className="p-4 font-semibold text-zinc-700 dark:text-zinc-200">{p.stock_quantity} units</td>
-                          <td className="p-4">
-                            <div className="flex flex-wrap gap-1.5 max-w-md">
-                              {(p.size_variants || []).map((v, idx) => (
-                                <span
-                                  key={idx}
-                                  className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
-                                    v.stock > 0
-                                      ? "bg-zinc-100 dark:bg-zinc-800/80 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300"
-                                      : "bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/25 text-rose-600 dark:text-rose-400"
-                                  }`}
-                                >
-                                  {v.size}: {v.stock}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="p-4 text-right">
-                            {p.stock_quantity === 0 ? (
-                              <Badge variant="destructive" dot={true}>Out of Stock</Badge>
-                            ) : hasOutOfStockVariant ? (
-                              <Badge variant="warning" dot={true}>Variant Alert</Badge>
-                            ) : isLowStock ? (
-                              <Badge variant="warning" dot={true}>Low Stock</Badge>
-                            ) : (
-                              <Badge variant="success" dot={true}>In Stock</Badge>
-                            )}
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                      Your Store Catalog is Empty
+                    </h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      Synchronize with your Shopify or WooCommerce store, or upload an inventory spreadsheet to populate products.
+                    </p>
+                  </div>
+
+                  <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button
+                      onClick={() => setIsShopifyModalOpen(true)}
+                      className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 transition-all flex flex-col items-center justify-center gap-2 group text-center"
+                    >
+                      <div className="h-10 w-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                        <ShoppingBag className="h-5 w-5" />
+                      </div>
+                      <span className="text-xs font-bold">Connect Shopify</span>
+                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400">Direct 1-Click Sync</span>
+                    </button>
+
+                    <button
+                      onClick={() => setIsWooCommerceModalOpen(true)}
+                      className="p-4 rounded-2xl border border-indigo-500/30 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-800 dark:text-indigo-300 transition-all flex flex-col items-center justify-center gap-2 group text-center"
+                    >
+                      <div className="h-10 w-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                        <Store className="h-5 w-5" />
+                      </div>
+                      <span className="text-xs font-bold">WooCommerce</span>
+                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400">REST API Sync</span>
+                    </button>
+
+                    <button
+                      onClick={() => setIsCsvModalOpen(true)}
+                      className="p-4 rounded-2xl border border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-800 dark:text-blue-300 transition-all flex flex-col items-center justify-center gap-2 group text-center"
+                    >
+                      <div className="h-10 w-10 rounded-xl gradient-blue-indigo text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                        <Upload className="h-5 w-5" />
+                      </div>
+                      <span className="text-xs font-bold">Upload CSV</span>
+                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400">Excel Spreadsheet</span>
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            ) : (
+              <Card className="p-0 overflow-hidden border-zinc-200 dark:border-zinc-800/80 bg-white dark:bg-zinc-900/60 shadow-xl">
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-left text-xs min-w-[640px]">
+                    <thead className="bg-zinc-100/90 dark:bg-zinc-900/90 border-b border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 font-semibold uppercase tracking-wider text-[10px]">
+                      <tr>
+                        <th className="p-4">SKU / Product Title</th>
+                        <th className="p-4">Category</th>
+                        <th className="p-4">Price</th>
+                        <th className="p-4">Total Stock</th>
+                        <th className="p-4">Size Variants Breakdown</th>
+                        <th className="p-4 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/60">
+                      {loading ? (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-zinc-500">
+                            Loading products from store database...
                           </td>
                         </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+                      ) : filteredProducts.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-zinc-500">
+                            No products match your search.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredProducts.map((p) => {
+                          const isLowStock = p.stock_quantity <= 5;
+                          const hasOutOfStockVariant = (p.size_variants || []).some((v) => v.stock === 0);
+                          const img = getProductImage(p.sku, p.category, p.title, p.image_url);
+
+                          return (
+                            <tr key={p.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                              <td className="p-4">
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={img}
+                                    alt={p.title}
+                                    className="h-10 w-10 rounded-xl object-cover border border-zinc-200 dark:border-zinc-800 shrink-0"
+                                  />
+                                  <div>
+                                    <div className="font-bold text-zinc-900 dark:text-white text-xs sm:text-sm">{p.title}</div>
+                                    <span className="font-mono text-[10px] text-zinc-500 dark:text-zinc-400">{p.sku}</span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <Badge variant="outline" className="text-[10px]">{p.category}</Badge>
+                              </td>
+                              <td className="p-4 font-black text-zinc-900 dark:text-white">{formatCurrency(p.price)}</td>
+                              <td className="p-4 font-semibold text-zinc-700 dark:text-zinc-200">{p.stock_quantity} units</td>
+                              <td className="p-4">
+                                <div className="flex flex-wrap gap-1.5 max-w-md">
+                                  {(p.size_variants || []).map((v, idx) => (
+                                    <span
+                                      key={idx}
+                                      className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
+                                        v.stock > 0
+                                          ? "bg-zinc-100 dark:bg-zinc-800/80 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                                          : "bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/25 text-rose-600 dark:text-rose-400"
+                                      }`}
+                                    >
+                                      {v.size}: {v.stock}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="p-4 text-right">
+                                {p.stock_quantity === 0 ? (
+                                  <Badge variant="destructive" dot={true}>Out of Stock</Badge>
+                                ) : hasOutOfStockVariant ? (
+                                  <Badge variant="warning" dot={true}>Variant Alert</Badge>
+                                ) : isLowStock ? (
+                                  <Badge variant="warning" dot={true}>Low Stock</Badge>
+                                ) : (
+                                  <Badge variant="success" dot={true}>In Stock</Badge>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+          </>
         )}
 
         {/* Tab 2: Customer Orders Table */}
@@ -543,6 +635,39 @@ export default function CatalogAndOrdersPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Shopify Connect Modal */}
+      {activeStore && (
+        <ShopifyConnectModal
+          isOpen={isShopifyModalOpen}
+          storeId={activeStore.id}
+          storeName={activeStore.name}
+          onClose={() => setIsShopifyModalOpen(false)}
+          onSuccess={loadData}
+        />
+      )}
+
+      {/* WooCommerce Connect Modal */}
+      {activeStore && (
+        <WooCommerceConnectModal
+          isOpen={isWooCommerceModalOpen}
+          storeId={activeStore.id}
+          storeName={activeStore.name}
+          onClose={() => setIsWooCommerceModalOpen(false)}
+          onSuccess={loadData}
+        />
+      )}
+
+      {/* CSV Upload Modal */}
+      {activeStore && (
+        <CsvUploadModal
+          isOpen={isCsvModalOpen}
+          storeId={activeStore.id}
+          storeName={activeStore.name}
+          onClose={() => setIsCsvModalOpen(false)}
+          onSuccess={loadData}
+        />
       )}
 
       {/* Webhook Simulator Modal */}

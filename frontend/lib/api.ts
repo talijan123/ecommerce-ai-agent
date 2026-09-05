@@ -15,6 +15,7 @@ export interface UserResponse {
   id: string;
   email: string;
   full_name?: string | null;
+  role?: string;
   is_verified: boolean;
   created_at: string;
   updated_at?: string | null;
@@ -161,6 +162,104 @@ export interface Order {
   total_amount: number;
   shipping_address?: string;
   created_at?: string;
+}
+
+// ==========================================
+// Integrations & Support Ticket Schemas
+// ==========================================
+
+export interface ShopifyConnectRequest {
+  store_id: string;
+  shop_domain: string;
+  access_token?: string;
+  api_key?: string;
+}
+
+export interface WooCommerceConnectRequest {
+  store_id: string;
+  shop_domain: string;
+  consumer_key?: string;
+  consumer_secret?: string;
+}
+
+export interface IntegrationResponse {
+  id: string;
+  store_id: string;
+  platform: string;
+  shop_domain?: string | null;
+  sync_status: string;
+  products_synced_count: number;
+  last_synced_at?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+}
+
+export interface SyncResultResponse {
+  success: boolean;
+  platform: string;
+  store_id: string;
+  products_synced: number;
+  sync_status: string;
+  message: string;
+  sample_products?: any[];
+}
+
+export interface TicketCreateRequest {
+  store_id?: string;
+  subject: string;
+  description: string;
+  category?: string;
+  priority?: string;
+}
+
+export interface TicketStatusUpdateRequest {
+  status: string;
+  resolution_notes?: string;
+}
+
+export interface TicketResponse {
+  id: string;
+  user_id: string;
+  store_id?: string | null;
+  user_email: string;
+  subject: string;
+  description: string;
+  category: string;
+  priority: string;
+  status: string;
+  resolution_notes?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+}
+
+export interface SuperAdminStats {
+  total_merchants: number;
+  total_stores: number;
+  active_stores: number;
+  total_products: number;
+  total_whatsapp_messages: number;
+  total_chat_sessions: number;
+  total_orders: number;
+  total_integrations: number;
+  tickets: {
+    open: number;
+    in_progress: number;
+    resolved: number;
+    total: number;
+  };
+  error?: string;
+}
+
+export interface SuperAdminTenant {
+  store_id: string;
+  store_name: string;
+  owner_email: string;
+  owner_name?: string | null;
+  whatsapp_phone_number_id: string;
+  is_active: boolean;
+  product_count: number;
+  integrations: string[];
+  created_at?: string | null;
 }
 
 export interface ToolInvocationLog {
@@ -339,6 +438,82 @@ export const api = {
       console.error("Failed to download sample CSV template:", err);
       window.open(`${API_BASE_URL}/api/v1/stores/sample-products-csv`, "_blank");
     }
+  },
+
+  // ----------------------------------------
+  // Direct Store Integrations
+  // ----------------------------------------
+  async connectShopify(data: ShopifyConnectRequest): Promise<IntegrationResponse> {
+    const res = await apiClient.post<IntegrationResponse>("/api/v1/integrations/shopify/connect", data);
+    return res.data;
+  },
+
+  async syncShopify(storeId: string, sampleCatalog: boolean = false): Promise<SyncResultResponse> {
+    const res = await apiClient.post<SyncResultResponse>("/api/v1/integrations/shopify/sync", {
+      store_id: storeId,
+      sample_catalog: sampleCatalog,
+    });
+    return res.data;
+  },
+
+  async connectWooCommerce(data: WooCommerceConnectRequest): Promise<IntegrationResponse> {
+    const res = await apiClient.post<IntegrationResponse>("/api/v1/integrations/woocommerce/connect", data);
+    return res.data;
+  },
+
+  async syncWooCommerce(storeId: string): Promise<SyncResultResponse> {
+    const res = await apiClient.post<SyncResultResponse>("/api/v1/integrations/woocommerce/sync", {
+      store_id: storeId,
+    });
+    return res.data;
+  },
+
+  async getStoreIntegrations(storeId: string): Promise<IntegrationResponse[]> {
+    const res = await apiClient.get<IntegrationResponse[]>(`/api/v1/integrations/${encodeURIComponent(storeId)}`);
+    return res.data;
+  },
+
+  // ----------------------------------------
+  // Support Tickets API
+  // ----------------------------------------
+  async createSupportTicket(data: TicketCreateRequest): Promise<TicketResponse> {
+    const res = await apiClient.post<TicketResponse>("/api/v1/support/tickets", data);
+    return res.data;
+  },
+
+  async getMySupportTickets(): Promise<TicketResponse[]> {
+    const res = await apiClient.get<TicketResponse[]>("/api/v1/support/tickets");
+    return res.data;
+  },
+
+  // ----------------------------------------
+  // Super-Admin Platform APIs
+  // ----------------------------------------
+  async getSuperAdminStats(): Promise<SuperAdminStats> {
+    const res = await apiClient.get<SuperAdminStats>("/api/v1/super-admin/stats");
+    return res.data;
+  },
+
+  async getSuperAdminTenants(search?: string): Promise<SuperAdminTenant[]> {
+    const res = await apiClient.get<SuperAdminTenant[]>("/api/v1/super-admin/tenants", {
+      params: search ? { search } : undefined,
+    });
+    return res.data;
+  },
+
+  async getSuperAdminTickets(statusFilter?: string): Promise<TicketResponse[]> {
+    const res = await apiClient.get<TicketResponse[]>("/api/v1/super-admin/tickets", {
+      params: statusFilter && statusFilter !== "All" ? { status_filter: statusFilter } : undefined,
+    });
+    return res.data;
+  },
+
+  async updateSuperAdminTicket(ticketId: string, data: TicketStatusUpdateRequest): Promise<TicketResponse> {
+    const res = await apiClient.patch<TicketResponse>(
+      `/api/v1/super-admin/tickets/${encodeURIComponent(ticketId)}`,
+      data
+    );
+    return res.data;
   },
 
   // ----------------------------------------

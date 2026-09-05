@@ -297,6 +297,102 @@ def test_whatsapp_sandbox_endpoints():
         print(f"  ✓ DISCONNECT command unlinked sandbox session cleanly")
 
 
+def test_store_integrations_and_tickets():
+    print("\n🔹 Testing Store Integrations, Support Tickets & Super-Admin Console...")
+    from app.core.security import create_access_token
+    from app.models.user import User
+    from app.models.store import Store
+
+    db = SessionLocal()
+    # Create or retrieve test user and store
+    test_user = db.query(User).filter(User.email == "admin@autocommerce.ai").first()
+    if not test_user:
+        test_user = User(
+            email="admin@autocommerce.ai",
+            hashed_password="hashed_test_password",
+            full_name="Platform Owner",
+            is_verified=True,
+            role="super_admin",
+        )
+        db.add(test_user)
+        db.commit()
+        db.refresh(test_user)
+    else:
+        test_user.role = "super_admin"
+        db.commit()
+        db.refresh(test_user)
+
+    user_id_str = str(test_user.id)
+    user_email = str(test_user.email)
+    sample_store = db.query(Store).first()
+    store_id_str = str(sample_store.id) if sample_store else None
+    db.close()
+
+    token = create_access_token({"sub": user_id_str, "email": user_email})
+    auth_headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Test Shopify Connect & Sync
+    if store_id_str:
+        shopify_payload = {
+            "store_id": store_id_str,
+            "shop_domain": "brand-demo.myshopify.com",
+            "access_token": "shpat_test_token_123",
+        }
+        res_shpf_conn = client.post("/api/v1/integrations/shopify/connect", json=shopify_payload, headers=auth_headers)
+        assert res_shpf_conn.status_code == 200
+        assert res_shpf_conn.json()["platform"] == "shopify"
+        print("  ✓ POST /api/v1/integrations/shopify/connect verified")
+
+        res_shpf_sync = client.post("/api/v1/integrations/shopify/sync", json={"store_id": store_id_str}, headers=auth_headers)
+        assert res_shpf_sync.status_code == 200
+        assert res_shpf_sync.json()["success"] is True
+        print(f"  ✓ POST /api/v1/integrations/shopify/sync synced {res_shpf_sync.json()['products_synced']} items")
+
+        # 2. Test List Integrations
+        res_list_int = client.get(f"/api/v1/integrations/{store_id_str}", headers=auth_headers)
+        assert res_list_int.status_code == 200
+        assert len(res_list_int.json()) >= 1
+        print(f"  ✓ GET /api/v1/integrations/{store_id_str} verified")
+
+    # 3. Test Support Ticket Submission
+    ticket_payload = {
+        "store_id": store_id_str,
+        "subject": "Webhook latency test",
+        "description": "Investigating WhatsApp webhook dispatch speed for catalog search queries.",
+        "category": "whatsapp",
+        "priority": "high",
+    }
+    res_ticket = client.post("/api/v1/support/tickets", json=ticket_payload, headers=auth_headers)
+    assert res_ticket.status_code == 201
+    created_ticket = res_ticket.json()
+    assert created_ticket["status"] == "Open"
+    print(f"  ✓ POST /api/v1/support/tickets created ticket #{created_ticket['id'][:8]}")
+
+    # 4. Test Super Admin Stats
+    res_stats = client.get("/api/v1/super-admin/stats", headers=auth_headers)
+    assert res_stats.status_code == 200
+    sa_stats = res_stats.json()
+    assert "total_merchants" in sa_stats
+    assert "tickets" in sa_stats
+    print(f"  ✓ GET /api/v1/super-admin/stats verified ({sa_stats['total_merchants']} merchants, {sa_stats['total_products']} products)")
+
+    # 5. Test Super Admin Tenants Directory
+    res_tenants = client.get("/api/v1/super-admin/tenants", headers=auth_headers)
+    assert res_tenants.status_code == 200
+    assert len(res_tenants.json()) >= 1
+    print(f"  ✓ GET /api/v1/super-admin/tenants verified ({len(res_tenants.json())} tenants listed)")
+
+    # 6. Test Super Admin Ticket Triage Update
+    res_patch = client.patch(
+        f"/api/v1/super-admin/tickets/{created_ticket['id']}",
+        json={"status": "Resolved", "resolution_notes": "Tested successfully on staging cluster."},
+        headers=auth_headers,
+    )
+    assert res_patch.status_code == 200
+    assert res_patch.json()["status"] == "Resolved"
+    print(f"  ✓ PATCH /api/v1/super-admin/tickets/{created_ticket['id'][:8]} resolved successfully")
+
+
 if __name__ == "__main__":
     print("=" * 75)
     print(" 🚀 RUNNING FASTAPI & DATABASE INTEGRATION TEST SUITE")
@@ -310,6 +406,7 @@ if __name__ == "__main__":
     test_webhooks_endpoints()
     test_admin_endpoints()
     test_whatsapp_sandbox_endpoints()
+    test_store_integrations_and_tickets()
     print("\n" + "=" * 75)
-    print(" 🎉 ALL FASTAPI, DATABASE, ADMIN, WEBHOOK & SANDBOX TESTS PASSED SUCCESSFULLY!")
+    print(" 🎉 ALL FASTAPI, DATABASE, ADMIN, WEBHOOK, INTEGRATION & SUPER-ADMIN TESTS PASSED!")
     print("=" * 75)

@@ -17,10 +17,11 @@ interface CsvUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   storeId: string;
+  storeName?: string;
   onSuccess: () => void;
 }
 
-export function CsvUploadModal({ isOpen, onClose, storeId, onSuccess }: CsvUploadModalProps) {
+export function CsvUploadModal({ isOpen, onClose, storeId, storeName, onSuccess }: CsvUploadModalProps) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
