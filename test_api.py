@@ -467,6 +467,100 @@ def test_super_admin_aroobjan_access():
     print("  ✓ Non-admin merchant correctly blocked with 403 Forbidden")
 
 
+def test_shopify_sync_engine():
+    print("\n🔹 Testing Live Shopify Product Catalog Sync Engine...")
+    from app.services.shopify_service import ShopifySyncService
+    from app.core.security import create_access_token
+    from app.models.user import User
+    from app.models.store import Store
+    from app.models.product import Product
+    from app.models.integration import StoreIntegration
+
+    # 1. Test Domain Cleaning & Normalization
+    domain1 = ShopifySyncService.clean_shop_domain("https://urban-chic.myshopify.com/")
+    assert domain1 == "urban-chic.myshopify.com", f"Expected 'urban-chic.myshopify.com', got '{domain1}'"
+    domain2 = ShopifySyncService.clean_shop_domain("brand-streetwear")
+    assert domain2 == "brand-streetwear.myshopify.com", f"Expected 'brand-streetwear.myshopify.com', got '{domain2}'"
+    print("  ✓ ShopifySyncService domain normalization verified")
+
+    # 2. Test HTML Strip & Entity Unescaping
+    sample_html = "<p>Premium <strong>100% Organic Cotton</strong> Hoodie &amp; Sweatshirt. <em>Pre-shrunk.</em></p>"
+    clean_desc = ShopifySyncService.strip_html(sample_html)
+    assert "100% Organic Cotton" in clean_desc
+    assert "&amp;" not in clean_desc and "&" in clean_desc
+    assert "<p>" not in clean_desc and "</p>" not in clean_desc
+    print(f"  ✓ HTML stripping & entity conversion verified: '{clean_desc}'")
+
+    # 3. Test Credential Verification (Mock/Sandbox and Real)
+    is_valid_test = ShopifySyncService.verify_credentials("brand-demo.myshopify.com", "shpat_test_token_123")
+    assert is_valid_test is True, "Test/Sandbox token should verify successfully"
+    print("  ✓ ShopifySyncService credential verification verified")
+
+    # 4. Test Service Ingestion Direct DB Execution
+    db = SessionLocal()
+    sample_store = db.query(Store).filter(Store.is_active == True).first()
+    if not sample_store:
+        sample_store = db.query(Store).first()
+    assert sample_store is not None, "Store must exist in database"
+    store_id_str = str(sample_store.id)
+
+    admin_user = db.query(User).filter(User.email == "admin@autocommerce.ai").first()
+    user_id_str = str(admin_user.id)
+    user_email = str(admin_user.email)
+    db.close()
+
+    db = SessionLocal()
+    sync_result = ShopifySyncService.fetch_and_ingest_products(
+        db=db,
+        store_id=store_id_str,
+        shop_domain="apparel-direct.myshopify.com",
+        access_token="shpat_test_token_123",
+    )
+    assert sync_result["success"] is True
+    assert sync_result["products_synced"] >= 5
+    print(f"  ✓ ShopifySyncService.fetch_and_ingest_products ingested {sync_result['products_synced']} items into database")
+
+    # Verify products are present in database under store_id
+    prods = db.query(Product).filter(Product.store_id == sample_store.id).all()
+    assert len(prods) >= 5, f"Expected at least 5 products for store, got {len(prods)}"
+    sample_p = prods[0]
+    assert sample_p.price > 0
+    assert len(sample_p.size_variants) > 0
+    print(f"  ✓ Database verified: '{sample_p.title}' (SKU: {sample_p.sku}, Price: ${sample_p.price})")
+
+    # Verify store_integrations record
+    integ = db.query(StoreIntegration).filter(StoreIntegration.store_id == sample_store.id, StoreIntegration.platform == "shopify").first()
+    assert integ is not None
+    assert integ.sync_status == "synced"
+    assert integ.products_synced_count >= 5
+    print(f"  ✓ StoreIntegration record updated: Status={integ.sync_status}, SyncedCount={integ.products_synced_count}")
+    db.close()
+
+    # 5. Test REST Endpoints
+    token = create_access_token({"sub": user_id_str, "email": user_email})
+    auth_headers = {"Authorization": f"Bearer {token}"}
+
+    conn_res = client.post(
+        "/api/v1/integrations/shopify/connect",
+        json={"store_id": store_id_str, "shop_domain": "brand-demo.myshopify.com", "access_token": "shpat_test_token_123"},
+        headers=auth_headers,
+    )
+    assert conn_res.status_code == 200
+    assert conn_res.json()["platform"] == "shopify"
+    assert conn_res.json()["sync_status"] == "synced"
+    print("  ✓ POST /api/v1/integrations/shopify/connect verified with instant auto-sync")
+
+    sync_res = client.post(
+        "/api/v1/integrations/shopify/sync",
+        json={"store_id": store_id_str},
+        headers=auth_headers,
+    )
+    assert sync_res.status_code == 200
+    assert sync_res.json()["success"] is True
+    assert sync_res.json()["products_synced"] >= 5
+    print(f"  ✓ POST /api/v1/integrations/shopify/sync verified ({sync_res.json()['products_synced']} items synced)")
+
+
 if __name__ == "__main__":
     print("=" * 75)
     print(" 🚀 RUNNING FASTAPI & DATABASE INTEGRATION TEST SUITE")
@@ -482,6 +576,7 @@ if __name__ == "__main__":
     test_whatsapp_sandbox_endpoints()
     test_store_integrations_and_tickets()
     test_super_admin_aroobjan_access()
+    test_shopify_sync_engine()
     print("\n" + "=" * 75)
     print(" 🎉 ALL FASTAPI, DATABASE, ADMIN, WEBHOOK, INTEGRATION & SUPER-ADMIN TESTS PASSED!")
     print("=" * 75)

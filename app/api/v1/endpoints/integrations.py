@@ -25,6 +25,8 @@ from app.schemas.integration import (
     SyncResultResponse,
 )
 
+from app.services.shopify_service import ShopifySyncService
+
 router = APIRouter()
 
 
@@ -56,7 +58,7 @@ def _get_user_store(store_id_str: str, db: Session, current_user: User) -> Store
     return store
 
 
-# Sample starter catalog when syncing Shopify or WooCommerce store in demo/initial mode
+# Sample starter catalog when syncing WooCommerce store in demo/initial mode
 SAMPLE_SHOPIFY_CATALOG = [
     {
         "title": "Minimalist Ceramic Desk Lamp",
@@ -129,11 +131,26 @@ def connect_shopify(
     """
     Connect a merchant's Shopify store:
     - Normalizes shop domain (e.g. brand.myshopify.com)
+    - Verifies credentials against Shopify Admin REST API
     - Saves or updates StoreIntegration record
-    - Sets initial status to 'connected'
+    - Triggers immediate product catalog ingestion
     """
     store = _get_user_store(payload.store_id, db, current_user)
-    clean_domain = payload.shop_domain.strip().lower().replace("https://", "").replace("http://", "").rstrip("/")
+    clean_domain = ShopifySyncService.clean_shop_domain(payload.shop_domain)
+    if not clean_domain:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Shopify domain. Please provide a valid store domain (e.g. brand.myshopify.com).",
+        )
+
+    # Validate token/credentials
+    if payload.access_token:
+        is_valid = ShopifySyncService.verify_credentials(clean_domain, payload.access_token)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to authenticate with Shopify store '{clean_domain}'. Please check your Admin API access token.",
+            )
 
     integration = (
         db.query(StoreIntegration)
@@ -166,6 +183,19 @@ def connect_shopify(
 
     db.commit()
     db.refresh(integration)
+
+    # Immediately ingest products
+    try:
+        ShopifySyncService.fetch_and_ingest_products(
+            db=db,
+            store_id=str(store.id),
+            shop_domain=clean_domain,
+            access_token=payload.access_token,
+        )
+        db.refresh(integration)
+    except Exception as e:
+        print(f"[ERROR] Shopify auto-sync failed during connect: {e}")
+
     return integration.to_dict()
 
 
@@ -181,7 +211,8 @@ def sync_shopify_catalog(
 ):
     """
     Sync products from connected Shopify store into merchant's product catalog:
-    - Ingests Shopify items into database with SKUs, variant breakdowns, and prices
+    - Fetches live products from Shopify Admin REST API
+    - Ingests & upserts items into database with SKUs, variant breakdowns, and prices
     - Updates StoreIntegration record with synced item count and timestamp
     """
     store = _get_user_store(payload.store_id, db, current_user)
@@ -195,57 +226,17 @@ def sync_shopify_catalog(
         .first()
     )
 
-    if not integration:
-        integration = StoreIntegration(
-            store_id=store.id,
-            platform="shopify",
-            shop_domain=f"{store.name.lower().replace(' ', '-')}.myshopify.com",
-            sync_status="syncing",
-            products_synced_count=0,
-        )
-        db.add(integration)
+    domain = integration.shop_domain if integration and integration.shop_domain else f"{store.name.lower().replace(' ', '-')}.myshopify.com"
+    token = integration.access_token if integration and integration.access_token else None
 
-    integration.sync_status = "syncing"
-    db.commit()
+    result = ShopifySyncService.fetch_and_ingest_products(
+        db=db,
+        store_id=str(store.id),
+        shop_domain=domain,
+        access_token=token,
+    )
 
-    # Ingest catalog items for this tenant
-    synced_items = []
-    for item in SAMPLE_SHOPIFY_CATALOG:
-        unique_sku = f"{item['sku']}-{str(store.id)[:4].upper()}"
-        existing = db.query(Product).filter(Product.sku == unique_sku).first()
-        if not existing:
-            product = Product(
-                store_id=store.id,
-                sku=unique_sku,
-                title=item["title"],
-                category=item["category"],
-                price=item["price"],
-                stock_quantity=item["stock"],
-                description=item["description"],
-                size_variants=item["sizes"],
-                rating=4.8,
-            )
-            db.add(product)
-            synced_items.append(product)
-
-    db.commit()
-
-    total_store_prods = db.query(Product).filter(Product.store_id == store.id).count()
-    integration.sync_status = "synced"
-    integration.products_synced_count = total_store_prods
-    integration.last_synced_at = datetime.now(timezone.utc)
-    integration.updated_at = datetime.now(timezone.utc)
-    db.commit()
-
-    return {
-        "success": True,
-        "platform": "shopify",
-        "store_id": str(store.id),
-        "products_synced": len(synced_items),
-        "sync_status": "synced",
-        "message": f"Successfully synchronized {len(synced_items)} products from Shopify into '{store.name}' catalog.",
-        "sample_products": [p.to_dict() for p in synced_items[:3]],
-    }
+    return result
 
 
 @router.post(

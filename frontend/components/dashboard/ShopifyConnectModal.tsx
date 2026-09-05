@@ -12,6 +12,11 @@ import {
   Zap,
   ShoppingBag,
   ArrowRight,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
+  KeyRound,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/lib/ui";
 import { api, formatApiError } from "@/lib/api";
@@ -31,11 +36,14 @@ export function ShopifyConnectModal({
   onClose,
   onSuccess,
 }: ShopifyConnectModalProps) {
-  const [shopDomain, setShopDomain] = useState(`${storeName.toLowerCase().replace(/[^a-z0-9]/g, "") || "my-brand"}.myshopify.com`);
-  const [accessToken, setAccessToken] = useState("shpat_live_merchant_987654321");
+  const [shopDomain, setShopDomain] = useState(
+    `${storeName.toLowerCase().replace(/[^a-z0-9]/g, "") || "my-brand"}.myshopify.com`
+  );
+  const [accessToken, setAccessToken] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [showHelpGuide, setShowHelpGuide] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successInfo, setSuccessInfo] = useState<string | null>(null);
 
@@ -53,7 +61,9 @@ export function ShopifyConnectModal({
 
     try {
       setLoading(true);
-      // 1. Connect Store Domain
+      setSyncing(true);
+
+      // 1. Connect Store Domain & verify token
       await api.connectShopify({
         store_id: storeId,
         shop_domain: shopDomain.trim(),
@@ -62,17 +72,19 @@ export function ShopifyConnectModal({
       });
 
       // 2. Trigger instant product sync
-      setSyncing(true);
       const syncRes = await api.syncShopify(storeId);
 
+      const count = syncRes.products_synced ?? syncRes.sample_products?.length ?? 0;
       setSuccessInfo(
-        `Connected to ${shopDomain}! Successfully synchronized ${syncRes.products_synced} products into your active catalog.`
+        `Successfully synced ${count} products from your Shopify store (${shopDomain.trim()})!`
       );
 
+      // Trigger catalog reload
+      onSuccess?.();
+
       setTimeout(() => {
-        onSuccess?.();
         onClose();
-      }, 1500);
+      }, 2000);
     } catch (err: any) {
       setErrorMsg(formatApiError(err));
     } finally {
@@ -83,18 +95,18 @@ export function ShopifyConnectModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="w-full max-w-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
         {/* Modal Header */}
-        <div className="p-5 border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-100/70 dark:bg-zinc-900/60 flex items-center justify-between">
+        <div className="p-5 border-b border-zinc-200 dark:border-zinc-800/80 bg-zinc-100/70 dark:bg-zinc-900/60 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/20">
+            <div className="h-10 w-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 shrink-0">
               <ShoppingBag className="h-5 w-5" />
             </div>
             <div>
               <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                Connect Shopify Store
+                <span>Connect Shopify Store</span>
                 <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  Direct API
+                  Live REST API
                 </span>
               </h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -103,6 +115,7 @@ export function ShopifyConnectModal({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
           >
@@ -111,7 +124,7 @@ export function ShopifyConnectModal({
         </div>
 
         {/* Modal Body / Form */}
-        <form onSubmit={handleConnectAndSync} className="p-6 space-y-4">
+        <form onSubmit={handleConnectAndSync} className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
           {errorMsg && (
             <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
               <AlertCircle className="h-4 w-4 shrink-0" />
@@ -145,16 +158,77 @@ export function ShopifyConnectModal({
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
-              <span>Admin API Access Token (Optional for Sandbox Sync)</span>
+              <span>Admin API Access Token</span>
               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">shpat_...</span>
             </label>
             <input
               type="password"
               value={accessToken}
               onChange={(e) => setAccessToken(e.target.value)}
-              placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx"
+              placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx (leave blank for demo sync)"
               className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white font-mono placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
             />
+          </div>
+
+          {/* Step-by-Step Help Accordion */}
+          <div className="border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden bg-zinc-50 dark:bg-zinc-900/40">
+            <button
+              type="button"
+              onClick={() => setShowHelpGuide(!showHelpGuide)}
+              className="w-full p-3 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center justify-between hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <HelpCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <span>How to get your Shopify Admin Access Token</span>
+              </div>
+              {showHelpGuide ? (
+                <ChevronUp className="h-4 w-4 text-zinc-400" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-zinc-400" />
+              )}
+            </button>
+
+            {showHelpGuide && (
+              <div className="p-3.5 pt-0 text-xs text-zinc-600 dark:text-zinc-400 space-y-2.5 border-t border-zinc-200 dark:border-zinc-800">
+                <div className="space-y-2 mt-2">
+                  <div className="flex items-start gap-2">
+                    <span className="h-5 w-5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">
+                      1
+                    </span>
+                    <p className="text-[11px] leading-relaxed">
+                      Go to your <strong>Shopify Admin</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Apps and sales channels</strong>.
+                    </p>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <span className="h-5 w-5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">
+                      2
+                    </span>
+                    <p className="text-[11px] leading-relaxed">
+                      Click <strong>Develop apps</strong> (enable custom app development if prompted) and select <strong>Create an app</strong>.
+                    </p>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <span className="h-5 w-5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">
+                      3
+                    </span>
+                    <p className="text-[11px] leading-relaxed">
+                      Under <strong>Configuration</strong> &rarr; <strong>Admin API integration</strong>, enable <code className="text-emerald-600 dark:text-emerald-400 font-mono text-[10px]">read_products</code> and <code className="text-emerald-600 dark:text-emerald-400 font-mono text-[10px]">read_inventory</code> scopes.
+                    </p>
+                  </div>
+
+                  <div className="flex items-start gap-2">
+                    <span className="h-5 w-5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">
+                      4
+                    </span>
+                    <p className="text-[11px] leading-relaxed">
+                      Click <strong>Install app</strong>, then copy the generated <strong>Admin API access token</strong> (starts with <code className="text-purple-600 dark:text-purple-400 font-mono text-[10px]">shpat_</code>).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs space-y-1">
@@ -163,12 +237,19 @@ export function ShopifyConnectModal({
               Instant Catalog Ingestion
             </div>
             <p className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
-              Connecting will automatically synchronize your product titles, prices, stock quantities, and SKU size variants directly into the database.
+              Connecting will automatically fetch your live product titles, descriptions, prices, SKU size variants, and inventory levels directly into the AI database.
             </p>
           </div>
 
           <div className="pt-2 flex items-center justify-end gap-3">
-            <Button variant="secondary" size="sm" type="button" onClick={onClose} disabled={loading} className="min-h-[40px]">
+            <Button
+              variant="secondary"
+              size="sm"
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="min-h-[40px]"
+            >
               Cancel
             </Button>
             <Button
@@ -181,11 +262,11 @@ export function ShopifyConnectModal({
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {syncing ? "Synchronizing Catalog..." : "Connecting..."}
+                  <span>Connecting &amp; Syncing products...</span>
                 </>
               ) : (
                 <>
-                  <span>Connect & Sync Catalog</span>
+                  <span>Connect &amp; Sync Catalog</span>
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
