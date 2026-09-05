@@ -3,7 +3,7 @@ SQLAlchemy Model for Chat History and Conversation Context Persistence.
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, JSON, DateTime
+from sqlalchemy import Column, Integer, String, Text, JSON, DateTime, ForeignKey, Uuid
 from app.core.database import Base
 
 
@@ -11,6 +11,7 @@ class ChatHistory(Base):
     __tablename__ = "chat_histories"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    store_id = Column(Uuid(as_uuid=True), ForeignKey("stores.id"), nullable=True, index=True)
     session_id = Column(String(100), index=True, nullable=False)
     role = Column(String(20), nullable=False)  # "system", "user", "assistant", "tool"
     content = Column(Text, nullable=True)
@@ -22,6 +23,7 @@ class ChatHistory(Base):
     def to_dict(self):
         return {
             "id": self.id,
+            "store_id": str(self.store_id) if self.store_id else None,
             "session_id": self.session_id,
             "role": self.role,
             "content": self.content,

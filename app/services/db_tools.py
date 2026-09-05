@@ -17,13 +17,20 @@ from app.models.product import Product
 logger = logging.getLogger(__name__)
 
 
-def track_order(order_id: str, db: Optional[Session] = None, client: Optional[Any] = None) -> Dict[str, Any]:
+def track_order(
+    order_id: str,
+    store_id: Optional[Any] = None,
+    db: Optional[Session] = None,
+    client: Optional[Any] = None,
+) -> Dict[str, Any]:
     """
     Queries the orders table directly in the database to track an order's status,
     tracking number, courier/carrier, created date, and items.
+    Scoped by tenant store_id if provided.
 
     Args:
         order_id: The unique identifier or order number of the order to track (e.g. '1042', '#1043').
+        store_id: Optional tenant Store ID (UUID or str) to partition query.
         db: Optional active SQLAlchemy session. If None, opens and manages a SessionLocal session.
         client: Optional compatibility parameter for mock sessions in tests.
 
@@ -53,13 +60,18 @@ def track_order(order_id: str, db: Optional[Session] = None, client: Optional[An
             except Exception:
                 pass
 
-        order = session.query(Order).filter(or_(*filters)).first()
+        query = session.query(Order).filter(or_(*filters))
+        if store_id is not None:
+            query = query.filter(Order.store_id == store_id)
+
+        order = query.first()
 
         if not order:
             return {"error": "Order not found"}
 
         return {
             "id": getattr(order, "id", None),
+            "store_id": str(order.store_id) if getattr(order, "store_id", None) else None,
             "order_number": getattr(order, "order_number", clean_id),
             "status": getattr(order, "status", "Processing"),
             "tracking_number": getattr(order, "tracking_number", None),
@@ -76,13 +88,20 @@ def track_order(order_id: str, db: Optional[Session] = None, client: Optional[An
             session.close()
 
 
-def check_product_stock(product_name: str, db: Optional[Session] = None, client: Optional[Any] = None) -> Dict[str, Any]:
+def check_product_stock(
+    product_name: str,
+    store_id: Optional[Any] = None,
+    db: Optional[Session] = None,
+    client: Optional[Any] = None,
+) -> Dict[str, Any]:
     """
     Queries the products table in the database directly (using case-insensitive matching)
     for stock quantity, price, and in-stock availability.
+    Scoped by tenant store_id if provided.
 
     Args:
         product_name: The name or keyword of the product to search for.
+        store_id: Optional tenant Store ID (UUID or str) to partition query.
         db: Optional active SQLAlchemy session. If None, opens and manages a SessionLocal session.
         client: Optional compatibility parameter for mock sessions in tests.
 
@@ -101,7 +120,7 @@ def check_product_stock(product_name: str, db: Optional[Session] = None, client:
         owns_session = True
 
     try:
-        products = (
+        query = (
             session.query(Product)
             .filter(
                 or_(
@@ -110,8 +129,11 @@ def check_product_stock(product_name: str, db: Optional[Session] = None, client:
                     Product.category.ilike(f"%{clean_name}%"),
                 )
             )
-            .all()
         )
+        if store_id is not None:
+            query = query.filter(Product.store_id == store_id)
+
+        products = query.all()
 
         if not products:
             return {"error": "Product not found"}
@@ -119,6 +141,7 @@ def check_product_stock(product_name: str, db: Optional[Session] = None, client:
         items = [
             {
                 "id": getattr(p, "id", None),
+                "store_id": str(p.store_id) if getattr(p, "store_id", None) else None,
                 "name": getattr(p, "title", clean_name),
                 "stock_quantity": getattr(p, "stock_quantity", 0),
                 "price": getattr(p, "price", 0.0),
@@ -146,9 +169,15 @@ DB_TOOL_MAP = {
 }
 
 
-def execute_db_tool(tool_name: str, arguments: Dict[str, Any], db: Optional[Session] = None, client: Optional[Any] = None) -> Dict[str, Any]:
+def execute_db_tool(
+    tool_name: str,
+    arguments: Dict[str, Any],
+    store_id: Optional[Any] = None,
+    db: Optional[Session] = None,
+    client: Optional[Any] = None,
+) -> Dict[str, Any]:
     """
-    Dispatcher to execute a database tool function by name.
+    Dispatcher to execute a database tool function by name with optional store_id scoping.
     """
     if tool_name == "track_order":
         func = track_order
@@ -157,11 +186,16 @@ def execute_db_tool(tool_name: str, arguments: Dict[str, Any], db: Optional[Sess
     else:
         return {"error": f"Tool '{tool_name}' is not recognized."}
 
+    # Pass store_id if supported by function and not already specified
+    call_args = dict(arguments)
+    if store_id is not None and "store_id" not in call_args:
+        call_args["store_id"] = store_id
+
     session = db or client
     try:
         if session is not None:
-            return func(db=session, **arguments)
-        return func(**arguments)
+            return func(db=session, **call_args)
+        return func(**call_args)
     except Exception as e:
         logger.error(f"❌ Exception executing DB tool {tool_name}: {e}", exc_info=True)
         return {"error": f"Error executing tool '{tool_name}': {str(e)}"}

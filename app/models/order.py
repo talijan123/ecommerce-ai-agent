@@ -3,7 +3,7 @@ SQLAlchemy Model for Orders and Shipping/Fulfillment Details.
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Float, Text, JSON, DateTime
+from sqlalchemy import Column, Integer, String, Float, Text, JSON, DateTime, ForeignKey, Uuid
 from app.core.database import Base
 
 
@@ -11,6 +11,7 @@ class Order(Base):
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    store_id = Column(Uuid(as_uuid=True), ForeignKey("stores.id"), nullable=True, index=True)
     order_number = Column(String(50), unique=True, index=True, nullable=False)
     customer_name = Column(String(150), nullable=False)
     customer_email = Column(String(150), index=True, nullable=False)
@@ -28,6 +29,7 @@ class Order(Base):
     def to_dict(self):
         return {
             "id": self.id,
+            "store_id": str(self.store_id) if self.store_id else None,
             "order_number": self.order_number,
             "customer_name": self.customer_name,
             "customer_email": self.customer_email,

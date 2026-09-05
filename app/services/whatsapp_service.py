@@ -41,27 +41,46 @@ class WhatsAppService:
     @property
     def is_configured(self) -> bool:
         """Check if live Meta credentials are provided."""
+        return self._is_configured()
+
+    def _is_configured(self, token: Optional[str] = None, phone_number_id: Optional[str] = None) -> bool:
+        """Check if live Meta credentials are provided (default or override)."""
+        active_token = token or self.token
+        active_phone_id = phone_number_id or self.phone_number_id
         return bool(
-            self.token
-            and self.phone_number_id
-            and "your_" not in self.token
-            and (self.token.startswith("EAA") or len(self.token) > 30)
-            and str(self.phone_number_id).strip() != ""
-            and "123456" not in str(self.phone_number_id)
+            active_token
+            and active_phone_id
+            and "your_" not in active_token
+            and (active_token.startswith("EAA") or len(active_token) > 30)
+            and str(active_phone_id).strip() != ""
+            and "123456" not in str(active_phone_id)
         )
+
+    def _get_base_url(self, phone_number_id: Optional[str] = None) -> str:
+        active_phone_id = phone_number_id or self.phone_number_id
+        return f"https://graph.facebook.com/{self.api_version}/{active_phone_id}"
 
     def _clean_phone(self, phone: str) -> str:
         """Sanitize phone number to digits only."""
         return "".join(c for c in str(phone) if c.isdigit())
 
-    async def send_text_message(self, to_phone_number: str, message_text: str) -> Dict[str, Any]:
+    async def send_text_message(
+        self,
+        to_phone_number: str,
+        message_text: str,
+        token: Optional[str] = None,
+        phone_number_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Send an outbound text message to a customer's WhatsApp number (Async).
+        Supports dynamic tenant credentials.
         """
         cleaned_phone = self._clean_phone(to_phone_number)
+        active_token = token or self.token
+        active_phone_id = phone_number_id or self.phone_number_id
 
         # Mock / Dry-run handling if credentials are not configured
-        if not self.is_configured:
+        if not self._is_configured(token=active_token, phone_number_id=active_phone_id):
             logger.info(
                 f"📱 [WhatsApp Dry-Run] To: {cleaned_phone} | Message: {message_text[:120]}..."
             )
@@ -72,9 +91,9 @@ class WhatsAppService:
                 "message": message_text,
             }
 
-        url = f"{self.base_url}/messages"
+        url = f"{self._get_base_url(active_phone_id)}/messages"
         headers = {
-            "Authorization": f"Bearer {self.token}",
+            "Authorization": f"Bearer {active_token}",
             "Content-Type": "application/json",
         }
         payload = {
@@ -100,13 +119,22 @@ class WhatsAppService:
             logger.error(f"❌ Failed to dispatch WhatsApp message: {str(e)}")
             return {"success": False, "error": str(e), "mock": False}
 
-    def send_text_message_sync(self, to_phone_number: str, message_text: str) -> Dict[str, Any]:
+    def send_text_message_sync(
+        self,
+        to_phone_number: str,
+        message_text: str,
+        token: Optional[str] = None,
+        phone_number_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Synchronous wrapper for outbound text messaging.
+        Supports dynamic tenant credentials.
         """
         cleaned_phone = self._clean_phone(to_phone_number)
+        active_token = token or self.token
+        active_phone_id = phone_number_id or self.phone_number_id
 
-        if not self.is_configured:
+        if not self._is_configured(token=active_token, phone_number_id=active_phone_id):
             logger.info(
                 f"📱 [WhatsApp Dry-Run (Sync)] To: {cleaned_phone} | Message: {message_text[:120]}..."
             )
@@ -117,9 +145,9 @@ class WhatsAppService:
                 "message": message_text,
             }
 
-        url = f"{self.base_url}/messages"
+        url = f"{self._get_base_url(active_phone_id)}/messages"
         headers = {
-            "Authorization": f"Bearer {self.token}",
+            "Authorization": f"Bearer {active_token}",
             "Content-Type": "application/json",
         }
         payload = {
@@ -151,13 +179,18 @@ class WhatsAppService:
         template_name: str,
         components: Optional[List[Dict[str, Any]]] = None,
         language_code: str = "en_US",
+        token: Optional[str] = None,
+        phone_number_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Send an official Meta pre-approved WhatsApp template message (Async).
+        Supports dynamic tenant credentials.
         """
         cleaned_phone = self._clean_phone(to_phone_number)
+        active_token = token or self.token
+        active_phone_id = phone_number_id or self.phone_number_id
 
-        if not self.is_configured:
+        if not self._is_configured(token=active_token, phone_number_id=active_phone_id):
             logger.info(
                 f"📱 [WhatsApp Template Dry-Run] To: {cleaned_phone} | Template: {template_name}"
             )
@@ -168,9 +201,9 @@ class WhatsAppService:
                 "template": template_name,
             }
 
-        url = f"{self.base_url}/messages"
+        url = f"{self._get_base_url(active_phone_id)}/messages"
         headers = {
-            "Authorization": f"Bearer {self.token}",
+            "Authorization": f"Bearer {active_token}",
             "Content-Type": "application/json",
         }
         payload = {
@@ -195,16 +228,25 @@ class WhatsAppService:
             logger.error(f"❌ WhatsApp template dispatch failed: {str(e)}")
             return {"success": False, "error": str(e), "mock": False}
 
-    async def mark_message_as_read(self, message_id: str) -> bool:
+    async def mark_message_as_read(
+        self,
+        message_id: str,
+        token: Optional[str] = None,
+        phone_number_id: Optional[str] = None,
+    ) -> bool:
         """
         Mark an incoming WhatsApp message as read to display blue checkmarks to the user.
+        Supports dynamic tenant credentials.
         """
-        if not self.is_configured:
+        active_token = token or self.token
+        active_phone_id = phone_number_id or self.phone_number_id
+
+        if not self._is_configured(token=active_token, phone_number_id=active_phone_id):
             return True
 
-        url = f"{self.base_url}/messages"
+        url = f"{self._get_base_url(active_phone_id)}/messages"
         headers = {
-            "Authorization": f"Bearer {self.token}",
+            "Authorization": f"Bearer {active_token}",
             "Content-Type": "application/json",
         }
         payload = {

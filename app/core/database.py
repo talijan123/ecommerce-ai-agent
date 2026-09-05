@@ -103,7 +103,7 @@ def create_db_and_tables():
     import app.models  # noqa: F401
     Base.metadata.create_all(bind=engine)
 
-    # Automatic schema migration for new columns in CartSession
+    # Automatic schema migration for new columns in PostgreSQL
     try:
         with engine.begin() as conn:
             if not db_url.startswith("sqlite"):
@@ -115,6 +115,10 @@ def create_db_and_tables():
                 conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'pending'"))
                 conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS customer_response_at TIMESTAMP"))
                 conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS last_customer_message TEXT"))
+                # Multi-tenancy store_id column migrations
+                conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id)"))
+                conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id)"))
+                conn.execute(text("ALTER TABLE chat_histories ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id)"))
     except Exception as e:
         # Pass gracefully if already migrated
         pass
@@ -125,7 +129,7 @@ _db_initialized = False
 
 def ensure_db_initialized():
     """
-    Ensure database tables are created and seeded with products if empty.
+    Ensure database tables are created, default store exists, and products seeded if empty.
     Runs on startup or on first database call.
     """
     global _db_initialized
@@ -135,8 +139,27 @@ def ensure_db_initialized():
     try:
         create_db_and_tables()
 
+        from app.models.store import Store
         from app.models.product import Product
+        from app.models.order import Order
+
         with SessionLocal() as db:
+            # Ensure default demo store exists
+            default_phone_id = settings.WHATSAPP_PHONE_NUMBER_ID or "1330161100179237"
+            store = db.query(Store).filter(Store.whatsapp_phone_number_id == default_phone_id).first()
+            if not store:
+                store = Store(
+                    name="AutoCommerce Demo Store",
+                    owner_email="merchant@autocommerce.example.com",
+                    whatsapp_phone_number_id=default_phone_id,
+                    whatsapp_access_token=settings.WHATSAPP_TOKEN,
+                    system_prompt="You are a helpful customer support assistant for AutoCommerce.",
+                    is_active=True,
+                )
+                db.add(store)
+                db.commit()
+                db.refresh(store)
+
             product_count = db.query(Product).count()
             if product_count == 0:
                 print("[INFO] Database empty. Seeding products from DummyJSON...")
@@ -146,6 +169,12 @@ def ensure_db_initialized():
                 except Exception:
                     from seed_db import seed_database
                     seed_database()
+
+            # Associate any unassigned products/orders to default store
+            if store:
+                db.query(Product).filter(Product.store_id.is_(None)).update({"store_id": store.id}, synchronize_session=False)
+                db.query(Order).filter(Order.store_id.is_(None)).update({"store_id": store.id}, synchronize_session=False)
+                db.commit()
 
         _db_initialized = True
     except Exception as e:

@@ -12,14 +12,34 @@ class ChatService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_history(self, session_id: str, limit: int = 15) -> List[Dict[str, Any]]:
+    @staticmethod
+    def build_session_id(customer_phone: str, store_id: Optional[Any] = None) -> str:
         """
-        Fetch recent messages for a session formatted for OpenAI chat completions.
+        Partition sessions by store_id and customer_phone.
+        """
+        clean_phone = "".join(c for c in str(customer_phone) if c.isdigit() or c == "+")
+        if store_id:
+            return f"store_{store_id}_wa_{clean_phone}"
+        return f"wa_{clean_phone}"
+
+    def get_history(
+        self,
+        session_id: str,
+        store_id: Optional[Any] = None,
+        limit: int = 15,
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch recent messages for a session formatted for OpenAI chat completions,
+        optionally filtered by tenant store_id.
         """
         try:
-            records = self.db.query(ChatHistory).filter(
+            query = self.db.query(ChatHistory).filter(
                 ChatHistory.session_id == session_id
-            ).order_by(ChatHistory.created_at.asc()).limit(limit).all()
+            )
+            if store_id is not None:
+                query = query.filter(ChatHistory.store_id == store_id)
+
+            records = query.order_by(ChatHistory.created_at.asc()).limit(limit).all()
 
             formatted_messages = []
             for r in records:
@@ -41,23 +61,26 @@ class ChatService:
     def get_gemini_history(
         self,
         session_id: str,
+        store_id: Optional[Any] = None,
         limit: int = 10,
         max_inactivity_hours: float = 4.0,
     ) -> List[Dict[str, Any]]:
         """
         Fetch multi-turn conversation history formatted for Gemini generateContent contents.
-        Applies context pruning (most recent 6-10 messages) and active session window check
-        (cleans context if user has been inactive for > 4 hours).
+        Applies context pruning (most recent 6-10 messages), active session window check
+        (cleans context if user has been inactive for > 4 hours), and tenant partitioning.
 
         Returns:
             List[Dict[str, Any]]: List of turns e.g. [{"role": "user", "parts": [{"text": "..."}]}, {"role": "model", "parts": [{"text": "..."}]}]
         """
         try:
-            # Query most recent messages for the given session
+            # Query most recent messages for the given session and tenant
+            query = self.db.query(ChatHistory).filter(ChatHistory.session_id == session_id)
+            if store_id is not None:
+                query = query.filter(ChatHistory.store_id == store_id)
+
             records = (
-                self.db.query(ChatHistory)
-                .filter(ChatHistory.session_id == session_id)
-                .order_by(ChatHistory.created_at.desc())
+                query.order_by(ChatHistory.created_at.desc())
                 .limit(limit)
                 .all()
             )
@@ -126,12 +149,14 @@ class ChatService:
         tool_calls: Optional[List[Dict[str, Any]]] = None,
         tool_call_id: Optional[str] = None,
         name: Optional[str] = None,
+        store_id: Optional[Any] = None,
     ) -> Optional[ChatHistory]:
         """
-        Store a message or tool execution step in the database with timestamps.
+        Store a message or tool execution step in the database with timestamps and tenant store_id.
         """
         try:
             record = ChatHistory(
+                store_id=store_id,
                 session_id=session_id,
                 role=role,
                 content=content,

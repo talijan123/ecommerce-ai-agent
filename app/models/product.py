@@ -4,7 +4,7 @@ SQLAlchemy Model for Products and Inventory Variants.
 
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from sqlalchemy import Column, Integer, String, Float, Text, JSON, DateTime
+from sqlalchemy import Column, Integer, String, Float, Text, JSON, DateTime, ForeignKey, Uuid
 from app.core.database import Base
 
 
@@ -12,6 +12,7 @@ class Product(Base):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    store_id = Column(Uuid(as_uuid=True), ForeignKey("stores.id"), nullable=True, index=True)
     sku = Column(String(100), unique=True, index=True, nullable=False)
     title = Column(String(255), index=True, nullable=False)
     description = Column(Text, nullable=True)
@@ -53,6 +54,7 @@ class Product(Base):
     def to_dict(self) -> Dict[str, Any]:
         return {
             "id": self.id,
+            "store_id": str(self.store_id) if self.store_id else None,
             "sku": self.sku,
             "title": self.title,
             "name": self.title,

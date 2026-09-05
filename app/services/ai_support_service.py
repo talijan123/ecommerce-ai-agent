@@ -156,12 +156,16 @@ class AISupportService:
         api_key: str,
         model: str,
         chat_history: Optional[List[Dict[str, Any]]] = None,
+        system_instruction: Optional[str] = None,
+        store_id: Optional[Any] = None,
+        db: Optional[Any] = None,
         max_turns: int = 5,
     ) -> Optional[str]:
         """
         Direct REST call to Google Gemini generateContent endpoint with multi-turn conversation memory,
-        dynamic Supabase Function Calling loop, and automatic model fallback.
+        dynamic Supabase Function Calling loop, tenant store_id scoping, and automatic model fallback.
         """
+        active_instruction = system_instruction or self.system_instruction
         primary_model = (model or "gemini-2.5-flash").replace("models/", "")
         candidate_models = [primary_model]
         for fallback_model in [
@@ -202,7 +206,7 @@ class AISupportService:
 
                 payload = {
                     "system_instruction": {
-                        "parts": [{"text": self.system_instruction}]
+                        "parts": [{"text": active_instruction}]
                     },
                     "contents": contents,
                     "tools": GEMINI_TOOLS,
@@ -240,10 +244,13 @@ class AISupportService:
                         if func_call:
                             func_name = func_call.get("name")
                             func_args = func_call.get("args", {})
-                            logger.info(f"🔧 [Gemini Function Call ({clean_model})]: {func_name}({func_args})")
+                            logger.info(f"🔧 [Gemini Function Call ({clean_model})]: {func_name}({func_args}) | store_id: {store_id}")
 
-                            # Execute the Supabase tool function
-                            tool_result = execute_supabase_tool(func_name, func_args)
+                            # Execute the Supabase tool function with tenant scoping
+                            if store_id is not None or db is not None:
+                                tool_result = execute_supabase_tool(func_name, func_args, store_id=store_id, db=db)
+                            else:
+                                tool_result = execute_supabase_tool(func_name, func_args)
                             logger.info(f"📦 [Supabase Tool Output]: {tool_result}")
 
                             # Append assistant's functionCall turn to contents
@@ -286,7 +293,7 @@ class AISupportService:
                         # Model may not support tools schema, try fallback generation
                         logger.info(f"[AISupport] Gemini model {clean_model} status 400, retrying simple generation...")
                         simple_payload = {
-                            "system_instruction": {"parts": [{"text": self.system_instruction}]},
+                            "system_instruction": {"parts": [{"text": active_instruction}]},
                             "contents": contents,
                             "generationConfig": {"temperature": 0.3, "maxOutputTokens": 800}
                         }
@@ -333,11 +340,16 @@ class AISupportService:
         self,
         prompt: str,
         chat_history: Optional[List[Dict[str, Any]]] = None,
+        system_instruction: Optional[str] = None,
+        store_id: Optional[Any] = None,
+        db: Optional[Any] = None,
     ) -> Optional[str]:
-        """Fallback to Groq / OpenAI LLM provider with multi-turn memory and tool execution loop."""
+        """Fallback to Groq / OpenAI LLM provider with multi-turn memory, tenant store_id scoping, and tool execution loop."""
         api_key = settings.GROQ_API_KEY or settings.OPENAI_API_KEY
         if not api_key:
             return None
+
+        active_instruction = system_instruction or self.system_instruction
 
         try:
             from openai import OpenAI
@@ -395,7 +407,7 @@ class AISupportService:
 
             for model_name in candidate_models:
                 try:
-                    messages = [{"role": "system", "content": self.system_instruction}]
+                    messages = [{"role": "system", "content": active_instruction}]
 
                     # Append past chat turns
                     if chat_history:
@@ -431,7 +443,10 @@ class AISupportService:
                                     f_args = json.loads(tc.function.arguments)
                                 except Exception:
                                     f_args = {}
-                                t_res = execute_supabase_tool(f_name, f_args)
+                                if store_id is not None or db is not None:
+                                    t_res = execute_supabase_tool(f_name, f_args, store_id=store_id, db=db)
+                                else:
+                                    t_res = execute_supabase_tool(f_name, f_args)
                                 messages.append({
                                     "role": "tool",
                                     "tool_call_id": tc.id,
@@ -463,11 +478,14 @@ class AISupportService:
         cart_session: Optional[CartSession] = None,
         customer_phone: Optional[str] = None,
         chat_history: Optional[List[Dict[str, Any]]] = None,
+        system_instruction: Optional[str] = None,
+        store_id: Optional[Any] = None,
         db: Optional[Any] = None,
     ) -> str:
         """
         Generate contextual AI response for an inbound customer WhatsApp message.
         Tries Gemini API with multi-turn chat memory & function calling -> Groq/OpenAI -> Guaranteed Fallback.
+        Scoped by tenant system_instruction and store_id if provided.
         """
         if not customer_message or not customer_message.strip():
             return self.fallback_reply
@@ -477,7 +495,8 @@ class AISupportService:
             try:
                 from app.services.chat_service import ChatService
                 cs = ChatService(db)
-                chat_history = cs.get_gemini_history(f"wa_{customer_phone}", limit=10, max_inactivity_hours=4.0)
+                session_id = ChatService.build_session_id(customer_phone, store_id=store_id)
+                chat_history = cs.get_gemini_history(session_id, store_id=store_id, limit=10, max_inactivity_hours=4.0)
             except Exception as e:
                 logger.warning(f"Could not load chat history for {customer_phone}: {e}")
 
@@ -494,6 +513,7 @@ class AISupportService:
             or os.environ.get("GOOGLE_API_KEY")
         )
         gemini_model = settings.GEMINI_MODEL or "gemini-2.5-flash"
+        active_instruction = system_instruction or self.system_instruction
 
         # 1. Attempt Gemini API with Multi-turn history and Function Calling
         if gemini_key and not gemini_key.startswith("your_"):
@@ -503,6 +523,9 @@ class AISupportService:
                     api_key=gemini_key,
                     model=gemini_model,
                     chat_history=chat_history,
+                    system_instruction=active_instruction,
+                    store_id=store_id,
+                    db=db,
                 )
                 if reply:
                     logger.info(f"🤖 [AISupport] Gemini AI ({gemini_model}) reply generated successfully.")
@@ -512,7 +535,13 @@ class AISupportService:
 
         # 2. Attempt secondary LLM Provider (Groq / OpenAI) with history and tool calling
         try:
-            secondary_reply = self._call_groq_fallback(prompt=prompt, chat_history=chat_history)
+            secondary_reply = self._call_groq_fallback(
+                prompt=prompt,
+                chat_history=chat_history,
+                system_instruction=active_instruction,
+                store_id=store_id,
+                db=db,
+            )
             if secondary_reply:
                 logger.info("🤖 [AISupport] Secondary LLM reply generated successfully.")
                 return secondary_reply
