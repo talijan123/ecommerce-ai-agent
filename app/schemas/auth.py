@@ -30,6 +30,7 @@ class UserResponse(BaseModel):
     id: UUID
     email: EmailStr
     full_name: Optional[str] = None
+    role: Optional[str] = "merchant"
     is_verified: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
