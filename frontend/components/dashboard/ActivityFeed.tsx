@@ -58,41 +58,41 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
   const getIcon = (type: string) => {
     switch (type) {
       case "order":
-        return <Package className="h-4 w-4 text-blue-400" />;
+        return <Package className="h-4 w-4 text-blue-500" />;
       case "inventory":
-        return <Zap className="h-4 w-4 text-amber-400" />;
+        return <Zap className="h-4 w-4 text-amber-500" />;
       case "discount":
-        return <ShoppingCart className="h-4 w-4 text-emerald-400" />;
+        return <ShoppingCart className="h-4 w-4 text-emerald-500" />;
       default:
-        return <MessageSquare className="h-4 w-4 text-indigo-400" />;
+        return <MessageSquare className="h-4 w-4 text-indigo-500" />;
     }
   };
 
   return (
-    <Card className="h-full flex flex-col border-zinc-800/80 bg-zinc-900/60 shadow-xl">
-      <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-zinc-800/80">
-        <CardTitle className="text-sm font-bold flex items-center gap-2 text-white">
-          <Clock className="h-4 w-4 text-blue-400" />
+    <Card className="h-full flex flex-col border border-zinc-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-zinc-900/60 shadow-sm rounded-2xl">
+      <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-zinc-200/80 dark:border-zinc-800/80 p-4 sm:p-5">
+        <CardTitle className="text-sm font-bold flex items-center gap-2 text-zinc-900 dark:text-white">
+          <Clock className="h-4 w-4 text-blue-500" />
           Live Autonomous AI Activity Feed
         </CardTitle>
         <Badge variant="success" dot={true}>Real-time Stream</Badge>
       </CardHeader>
 
-      <CardContent className="pt-4 space-y-3 flex-1 overflow-y-auto max-h-[420px] custom-scrollbar">
+      <CardContent className="pt-4 p-4 sm:p-5 space-y-3 flex-1 overflow-y-auto max-h-[420px] custom-scrollbar">
         {items.map((item) => (
           <div
             key={item.id}
-            className="p-3.5 rounded-2xl border border-zinc-800/80 bg-zinc-950/60 hover:bg-zinc-800/40 transition-all flex items-start gap-3"
+            className="p-3.5 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/70 dark:bg-zinc-950/60 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/40 transition-all flex items-start gap-3"
           >
-            <div className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 shrink-0 mt-0.5 shadow-sm">
+            <div className="p-2 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shrink-0 mt-0.5 shadow-sm">
               {getIcon(item.type)}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2">
-                <h4 className="text-xs font-bold text-white truncate">{item.title}</h4>
+                <h4 className="text-xs font-bold text-zinc-900 dark:text-white truncate">{item.title}</h4>
                 <span className="text-[10px] text-zinc-400 font-mono whitespace-nowrap">{formatDate(item.time)}</span>
               </div>
-              <p className="text-xs text-zinc-300 mt-1 leading-relaxed">{item.description}</p>
+              <p className="text-xs text-zinc-600 dark:text-zinc-300 mt-1 leading-relaxed">{item.description}</p>
               <div className="mt-2 flex items-center gap-2">
                 <Badge variant={item.status === "Recovered" ? "success" : "indigo"} className="text-[10px]">
                   <CheckCircle2 className="h-3 w-3" />

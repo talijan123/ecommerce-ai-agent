@@ -275,24 +275,25 @@ export function OnboardingWizard({ isOpen, onClose, onComplete }: OnboardingWiza
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
-      <div className="glass-card w-full max-w-2xl rounded-3xl p-6 sm:p-8 border border-zinc-200 dark:border-zinc-800 shadow-2xl relative bg-white dark:bg-zinc-950 my-8">
+      <div className="glass-card w-full max-w-2xl max-h-[92vh] overflow-y-auto overflow-x-hidden rounded-3xl p-4 sm:p-6 md:p-8 border border-zinc-200 dark:border-zinc-800 shadow-2xl relative bg-white dark:bg-zinc-950 my-auto">
         {/* Close Button (if dismissible) */}
         {onClose && (
           <button
             onClick={onClose}
-            className="absolute top-5 right-5 p-2 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
+            aria-label="Close wizard"
+            className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors z-20"
           >
             <X className="h-5 w-5" />
           </button>
         )}
 
         {/* Stepper Progress Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between max-w-md mx-auto relative mb-3">
+        <div className="mb-6 sm:mb-8">
+          <div className="flex items-center justify-between max-w-md mx-auto relative mb-3 px-3">
             {/* Connecting Line */}
-            <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-0.5 bg-zinc-200 dark:bg-zinc-800 -z-0" />
+            <div className="absolute left-8 right-8 top-1/2 -translate-y-1/2 h-0.5 bg-zinc-200 dark:bg-zinc-800 -z-0" />
             <div
-              className="absolute left-6 top-1/2 -translate-y-1/2 h-0.5 bg-blue-600 transition-all duration-300 -z-0"
+              className="absolute left-8 top-1/2 -translate-y-1/2 h-0.5 bg-blue-600 transition-all duration-300 -z-0"
               style={{
                 width:
                   currentStep === 1 ? "0%" : currentStep === 2 ? "50%" : "100%",
@@ -302,15 +303,15 @@ export function OnboardingWizard({ isOpen, onClose, onComplete }: OnboardingWiza
             {/* Step 1 Pill */}
             <div className="flex flex-col items-center relative z-10">
               <div
-                className={`h-9 w-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all ${
+                className={`h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all ${
                   currentStep >= 1
                     ? "gradient-blue-indigo text-white shadow-md shadow-blue-500/25"
                     : "bg-zinc-100 dark:bg-zinc-900 text-zinc-400 border border-zinc-200 dark:border-zinc-800"
                 }`}
               >
-                {currentStep > 1 ? <CheckCircle2 className="h-5 w-5" /> : "1"}
+                {currentStep > 1 ? <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" /> : "1"}
               </div>
-              <span className="text-[10px] font-bold mt-1 text-zinc-600 dark:text-zinc-400">
+              <span className="text-[10px] font-bold mt-1 text-zinc-600 dark:text-zinc-400 text-center">
                 Store Setup
               </span>
             </div>
@@ -318,32 +319,32 @@ export function OnboardingWizard({ isOpen, onClose, onComplete }: OnboardingWiza
             {/* Step 2 Pill */}
             <div className="flex flex-col items-center relative z-10">
               <div
-                className={`h-9 w-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all ${
+                className={`h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all ${
                   currentStep >= 2
                     ? "gradient-blue-indigo text-white shadow-md shadow-blue-500/25"
                     : "bg-zinc-100 dark:bg-zinc-900 text-zinc-400 border border-zinc-200 dark:border-zinc-800"
                 }`}
               >
-                {currentStep > 2 ? <CheckCircle2 className="h-5 w-5" /> : "2"}
+                {currentStep > 2 ? <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" /> : "2"}
               </div>
-              <span className="text-[10px] font-bold mt-1 text-zinc-600 dark:text-zinc-400">
-                Product Catalog
+              <span className="text-[10px] font-bold mt-1 text-zinc-600 dark:text-zinc-400 text-center">
+                Catalog
               </span>
             </div>
 
             {/* Step 3 Pill */}
             <div className="flex flex-col items-center relative z-10">
               <div
-                className={`h-9 w-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all ${
+                className={`h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all ${
                   currentStep >= 3
                     ? "gradient-blue-indigo text-white shadow-md shadow-blue-500/25"
                     : "bg-zinc-100 dark:bg-zinc-900 text-zinc-400 border border-zinc-200 dark:border-zinc-800"
                 }`}
               >
-                {currentStep >= 4 ? <CheckCircle2 className="h-5 w-5" /> : "3"}
+                {currentStep >= 4 ? <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" /> : "3"}
               </div>
-              <span className="text-[10px] font-bold mt-1 text-zinc-600 dark:text-zinc-400">
-                WhatsApp API
+              <span className="text-[10px] font-bold mt-1 text-zinc-600 dark:text-zinc-400 text-center">
+                WhatsApp
               </span>
             </div>
           </div>

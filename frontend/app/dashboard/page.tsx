@@ -28,6 +28,9 @@ import {
   ChevronDown,
   Layers,
   Sparkles,
+  Smartphone,
+  Check,
+  X,
 } from "lucide-react";
 import { Header } from "@/components/dashboard/Header";
 import { MetricsCard } from "@/components/dashboard/MetricsCard";
@@ -162,31 +165,32 @@ export default function DashboardOverviewPage() {
   }, [products, catalogSearch, catalogCategory]);
 
   const totalRevenue = orders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
-  const isWhatsAppConnected = Boolean(
+  const isCustomWhatsApp = Boolean(
     activeStore?.whatsapp_phone_number_id &&
       !activeStore.whatsapp_phone_number_id.startsWith("pending-")
   );
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col min-w-0">
       {/* Top Header Bar */}
       <Header
         title="Merchant AI Command Center"
         description="Autonomous customer inquiry resolution, WhatsApp Cloud API sync, and multi-tenant catalog management."
         onRefresh={loadDashboard}
         onOpenSimulator={() => setIsSimulatorOpen(true)}
+        onOpenWhatsAppTest={() => setIsTestWhatsAppOpen(true)}
       />
 
-      <main className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1">
+      <main className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 max-w-7xl w-full mx-auto">
         {/* ============================================================ */}
         {/* NO STORES WELCOME BANNER (IF 0 STORES) */}
         {/* ============================================================ */}
         {!loading && stores.length === 0 && (
-          <Card className="p-8 sm:p-10 border-indigo-500/30 bg-gradient-to-br from-blue-950/40 via-zinc-900/90 to-indigo-950/40 text-center rounded-3xl shadow-2xl">
-            <div className="h-16 w-16 rounded-2xl gradient-blue-indigo flex items-center justify-center text-white mx-auto mb-4 shadow-xl shadow-indigo-500/25">
-              <Bot className="h-8 w-8" />
+          <Card className="p-6 sm:p-10 border-indigo-500/30 bg-gradient-to-br from-blue-950/40 via-zinc-900/90 to-indigo-950/40 text-center rounded-3xl shadow-2xl">
+            <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl gradient-blue-indigo flex items-center justify-center text-white mx-auto mb-4 shadow-xl shadow-indigo-500/25 animate-bounce">
+              <Bot className="h-7 w-7 sm:h-8 sm:w-8" />
             </div>
-            <h3 className="text-2xl font-black text-white tracking-tight">
+            <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
               Welcome to AutoCommerce SaaS!
             </h3>
             <p className="text-xs sm:text-sm text-zinc-300 max-w-lg mx-auto mt-2 mb-6 leading-relaxed">
@@ -196,7 +200,7 @@ export default function DashboardOverviewPage() {
               variant="gradient"
               size="lg"
               onClick={() => setIsOnboardingOpen(true)}
-              className="gap-2 font-bold shadow-xl shadow-blue-500/25 px-8"
+              className="gap-2 font-bold shadow-xl shadow-blue-500/25 px-6 sm:px-8 w-full sm:w-auto h-11 sm:h-12 text-sm"
             >
               <Sparkles className="h-4 w-4" />
               <span>Launch 3-Step Store Setup Wizard</span>
@@ -208,29 +212,29 @@ export default function DashboardOverviewPage() {
         {/* ACTIVE MERCHANT STORE TENANT OVERVIEW */}
         {/* ============================================================ */}
         {activeStore && (
-          <Card className="p-5 sm:p-6 border-zinc-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-zinc-900/60 shadow-lg rounded-2xl">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <Card className="p-4 sm:p-6 border border-zinc-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-zinc-900/60 shadow-sm rounded-2xl transition-all duration-200 hover:shadow-md">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-5">
               {/* Store Identity & Switcher */}
-              <div className="space-y-2">
+              <div className="space-y-1.5 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="indigo" dot={true}>
+                  <Badge variant="indigo" dot={true} className="text-[10px]">
                     Active Store Tenant
                   </Badge>
-                  {isWhatsAppConnected ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold border border-emerald-500/20">
+                  {isCustomWhatsApp ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold border border-emerald-500/20">
                       <ShieldCheck className="h-3.5 w-3.5" />
-                      WhatsApp Connected
+                      Custom Meta WhatsApp
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-bold border border-amber-500/20">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      WhatsApp Action Required
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] font-bold border border-blue-500/20">
+                      <Smartphone className="h-3.5 w-3.5" />
+                      Instant WhatsApp Sandbox Mode
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <h2 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h2 className="text-lg sm:text-2xl font-black text-zinc-900 dark:text-white tracking-tight truncate">
                     {activeStore.name}
                   </h2>
 
@@ -239,7 +243,7 @@ export default function DashboardOverviewPage() {
                     <select
                       value={activeStore.id}
                       onChange={(e) => handleStoreChange(e.target.value)}
-                      className="text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-1 text-zinc-900 dark:text-white focus:outline-none"
+                      className="text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-2.5 py-1 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     >
                       {stores.map((s) => (
                         <option key={s.id} value={s.id}>
@@ -250,18 +254,18 @@ export default function DashboardOverviewPage() {
                   )}
                 </div>
 
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono truncate">
                   Tenant ID: {activeStore.id} • Owner: {activeStore.owner_email}
                 </p>
               </div>
 
               {/* Quick Actions Bar */}
-              <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
                 <Button
                   variant="primary"
                   size="md"
                   onClick={() => setIsTestWhatsAppOpen(true)}
-                  className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md shadow-emerald-500/20"
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-md shadow-emerald-500/20 text-xs sm:text-sm h-10 sm:h-10 flex-1 sm:flex-initial"
                 >
                   <QrCode className="h-4 w-4" />
                   <span>Test on WhatsApp</span>
@@ -271,17 +275,17 @@ export default function DashboardOverviewPage() {
                   variant="outline"
                   size="md"
                   onClick={() => setIsCsvModalOpen(true)}
-                  className="gap-2 text-xs font-semibold"
+                  className="gap-2 text-xs font-semibold h-10 sm:h-10 flex-1 sm:flex-initial"
                 >
                   <Upload className="h-4 w-4 text-indigo-500" />
-                  <span>Import Products CSV</span>
+                  <span>Import CSV</span>
                 </Button>
 
                 <Button
                   variant="secondary"
                   size="md"
                   onClick={() => setIsOnboardingOpen(true)}
-                  className="gap-1.5 text-xs font-semibold"
+                  className="gap-1.5 text-xs font-semibold h-10 sm:h-10"
                 >
                   <Plus className="h-4 w-4" />
                   <span>New Store</span>
@@ -294,29 +298,30 @@ export default function DashboardOverviewPage() {
         {/* ============================================================ */}
         {/* KPI METRICS GRID */}
         {/* ============================================================ */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
           <MetricsCard
             title="Catalog Products"
             value={products.length}
-            description="Active SKUs in store inventory"
+            description="Active inventory SKUs"
             icon={Package}
             color="indigo"
-            trend={`${products.reduce((acc, p) => acc + (p.stock_quantity || 0), 0)} units total`}
+            trend={`${products.reduce((acc, p) => acc + (p.stock_quantity || 0), 0)} units`}
             trendUp={true}
           />
           <MetricsCard
-            title="Total Revenue"
-            value={formatCurrency(totalRevenue > 0 ? totalRevenue : 2480.95)}
-            description="Gross sales across fulfilled orders"
-            icon={DollarSign}
+            title="WhatsApp Bot Status"
+            value={isCustomWhatsApp ? "Meta Connected" : "Sandbox Mode"}
+            description="Scan QR to test live turns"
+            icon={Smartphone}
             color="emerald"
-            trend="+14.2% MoM"
+            trend="Active 24/7"
             trendUp={true}
+            onClick={() => setIsTestWhatsAppOpen(true)}
           />
           <MetricsCard
             title="AI Inquiries Handled"
             value={stats ? stats.total_conversations : "..."}
-            description="Customer sessions resolved"
+            description="Resolved autonomously"
             icon={MessageSquare}
             color="blue"
             trend="100% Grounded"
@@ -325,10 +330,10 @@ export default function DashboardOverviewPage() {
           <MetricsCard
             title="Cart Recovery Rate"
             value={stats ? `${stats.cart_recovery_rate_pct}%` : "..."}
-            description="Automated discount conversions"
+            description="Promo discount conversions"
             icon={ShoppingCart}
             color="amber"
-            trend="Promo SAVE15"
+            trend={formatCurrency(totalRevenue > 0 ? totalRevenue : 2480.95)}
             trendUp={true}
           />
         </div>
@@ -336,84 +341,103 @@ export default function DashboardOverviewPage() {
         {/* ============================================================ */}
         {/* PRODUCT CATALOG OVERVIEW TABLE */}
         {/* ============================================================ */}
-        <Card className="border-zinc-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-zinc-900/60 shadow-lg rounded-2xl overflow-hidden">
-          <div className="p-5 border-b border-zinc-200/80 dark:border-zinc-800/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                <h3 className="text-base font-bold text-zinc-900 dark:text-white">
-                  Product Catalog & Stock Matrix
-                </h3>
+        <Card className="border border-zinc-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-zinc-900/60 shadow-sm rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-md">
+          <div className="p-4 sm:p-5 border-b border-zinc-200/80 dark:border-zinc-800/80 space-y-3 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <h3 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white">
+                    Product Catalog & Stock Matrix
+                  </h3>
+                </div>
+                <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  Live inventory synced with autonomous WhatsApp AI agent search
+                </p>
               </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Live inventory synced with autonomous WhatsApp AI agent grounded search
-              </p>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => api.downloadSampleProductsCsv()}
+                  className="gap-1.5 text-xs h-8 sm:h-9"
+                >
+                  <Download className="h-3.5 w-3.5 text-indigo-500" />
+                  <span className="hidden sm:inline">Template CSV</span>
+                  <span className="sm:hidden">Template</span>
+                </Button>
+
+                {activeStore && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setIsCsvModalOpen(true)}
+                    className="gap-1.5 text-xs font-bold h-8 sm:h-9"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>Import CSV</span>
+                  </Button>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center gap-2.5 flex-wrap">
-              {/* Category Filter */}
-              <select
-                value={catalogCategory}
-                onChange={(e) => setCatalogCategory(e.target.value)}
-                className="text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-zinc-900 dark:text-white focus:outline-none"
-              >
+            {/* Filter & Search Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              {/* Category Pills (Horizontal Scroll on Mobile) */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 max-w-full">
                 {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    Category: {cat}
-                  </option>
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCatalogCategory(cat)}
+                    className={`px-3 py-1 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                      catalogCategory === cat
+                        ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20"
+                        : "bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/70"
+                    }`}
+                  >
+                    {cat}
+                  </button>
                 ))}
-              </select>
+              </div>
 
-              {/* Search Bar */}
-              <div className="relative min-w-[200px]">
+              {/* Search Input */}
+              <div className="relative w-full sm:w-64 shrink-0">
                 <Search className="h-3.5 w-3.5 absolute left-3 top-2.5 text-zinc-400 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Filter by title, SKU..."
                   value={catalogSearch}
                   onChange={(e) => setCatalogSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full pl-9 pr-8 py-1.5 text-xs rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 />
+                {catalogSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setCatalogSearch("")}
+                    className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-white"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
-
-              {/* Sample Template CSV */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => api.downloadSampleProductsCsv()}
-                className="gap-1.5 text-xs"
-              >
-                <Download className="h-3.5 w-3.5 text-indigo-500" />
-                <span>Template CSV</span>
-              </Button>
-
-              {/* Import CSV */}
-              {activeStore && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setIsCsvModalOpen(true)}
-                  className="gap-1.5 text-xs font-bold"
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                  <span>Import CSV</span>
-                </Button>
-              )}
             </div>
           </div>
 
-          {/* Table Container */}
+          {/* Responsive Table Container */}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-50 dark:bg-zinc-950/60 border-b border-zinc-200 dark:border-zinc-800/80 text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+              <thead className="bg-zinc-50 dark:bg-zinc-950/60 border-b border-zinc-200 dark:border-zinc-800/80 text-[10px] sm:text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3 px-4">SKU / Code</th>
-                  <th className="py-3 px-4">Product Name</th>
-                  <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Price</th>
-                  <th className="py-3 px-4">Total Stock</th>
-                  <th className="py-3 px-4">Available Variants</th>
-                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-3.5 sm:px-4">SKU / Code</th>
+                  <th className="py-3 px-3.5 sm:px-4">Product Name</th>
+                  <th className="py-3 px-3.5 sm:px-4">Category</th>
+                  <th className="py-3 px-3.5 sm:px-4">Price</th>
+                  <th className="py-3 px-3.5 sm:px-4">Total Stock</th>
+                  <th className="py-3 px-3.5 sm:px-4">Variants</th>
+                  <th className="py-3 px-3.5 sm:px-4">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200/70 dark:divide-zinc-800/70">
@@ -426,7 +450,7 @@ export default function DashboardOverviewPage() {
                 ) : filteredProducts.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-8 text-center text-zinc-400">
-                      No products found. Use &quot;Import CSV&quot; to populate your store catalog.
+                      No products found matching criteria. Use &quot;Import CSV&quot; to populate your store catalog.
                     </td>
                   </tr>
                 ) : (
@@ -437,21 +461,21 @@ export default function DashboardOverviewPage() {
                         key={product.id || product.sku}
                         className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40 transition-colors"
                       >
-                        <td className="py-3 px-4 font-mono font-bold text-zinc-900 dark:text-zinc-200">
+                        <td className="py-3 px-3.5 sm:px-4 font-mono font-bold text-zinc-900 dark:text-zinc-200">
                           {product.sku}
                         </td>
-                        <td className="py-3 px-4 font-semibold text-zinc-900 dark:text-white max-w-xs truncate">
+                        <td className="py-3 px-3.5 sm:px-4 font-semibold text-zinc-900 dark:text-white max-w-xs truncate">
                           {product.title || product.name}
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-3.5 sm:px-4">
                           <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium text-[10px]">
                             {product.category || "General"}
                           </span>
                         </td>
-                        <td className="py-3 px-4 font-bold text-zinc-900 dark:text-white">
+                        <td className="py-3 px-3.5 sm:px-4 font-bold text-zinc-900 dark:text-white">
                           ${Number(product.price).toFixed(2)}
                         </td>
-                        <td className="py-3 px-4 font-mono">
+                        <td className="py-3 px-3.5 sm:px-4 font-mono">
                           <span
                             className={
                               isOutOfStock
@@ -464,7 +488,7 @@ export default function DashboardOverviewPage() {
                             {product.stock_quantity || 0}
                           </span>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-3.5 sm:px-4">
                           <div className="flex items-center gap-1 flex-wrap max-w-xs">
                             {(product.size_variants || []).map((v, idx) => (
                               <span
@@ -480,11 +504,11 @@ export default function DashboardOverviewPage() {
                             ))}
                           </div>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-3.5 sm:px-4">
                           {isOutOfStock ? (
-                            <Badge variant="destructive">Out of Stock</Badge>
+                            <Badge variant="destructive" className="text-[10px]">Out of Stock</Badge>
                           ) : (
-                            <Badge variant="success">In Stock</Badge>
+                            <Badge variant="success" className="text-[10px]">In Stock</Badge>
                           )}
                         </td>
                       </tr>
@@ -511,13 +535,13 @@ export default function DashboardOverviewPage() {
           </div>
 
           <div className="space-y-6">
-            <Card className="p-5 space-y-4 border-zinc-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-zinc-900/60 shadow-lg rounded-2xl">
+            <Card className="p-4 sm:p-5 space-y-4 border border-zinc-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-zinc-900/60 shadow-sm rounded-2xl">
               <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80 pb-3">
-                <h4 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <h4 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-emerald-500" />
                   AI Anti-Hallucination Guardrails
                 </h4>
-                <Badge variant="success" dot={true}>
+                <Badge variant="success" dot={true} className="text-[10px]">
                   Enforced
                 </Badge>
               </div>

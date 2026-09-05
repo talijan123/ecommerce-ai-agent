@@ -11,6 +11,7 @@ interface MetricsCardProps {
   trend?: string;
   trendUp?: boolean;
   color?: "blue" | "emerald" | "amber" | "indigo" | "rose";
+  onClick?: () => void;
 }
 
 export function MetricsCard({
@@ -21,54 +22,63 @@ export function MetricsCard({
   trend,
   trendUp = true,
   color = "blue",
+  onClick,
 }: MetricsCardProps) {
   const colorMap = {
     blue: {
-      bg: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-      glow: "hover:border-blue-500/40 hover:shadow-blue-500/5",
+      bg: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+      glow: "hover:border-blue-500/40 hover:shadow-blue-500/10",
     },
     emerald: {
-      bg: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-      glow: "hover:border-emerald-500/40 hover:shadow-emerald-500/5",
+      bg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+      glow: "hover:border-emerald-500/40 hover:shadow-emerald-500/10",
     },
     amber: {
-      bg: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-      glow: "hover:border-amber-500/40 hover:shadow-amber-500/5",
+      bg: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+      glow: "hover:border-amber-500/40 hover:shadow-amber-500/10",
     },
     indigo: {
-      bg: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
-      glow: "hover:border-indigo-500/40 hover:shadow-indigo-500/5",
+      bg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+      glow: "hover:border-indigo-500/40 hover:shadow-indigo-500/10",
     },
     rose: {
-      bg: "bg-rose-500/10 text-rose-400 border-rose-500/20",
-      glow: "hover:border-rose-500/40 hover:shadow-rose-500/5",
+      bg: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+      glow: "hover:border-rose-500/40 hover:shadow-rose-500/10",
     },
   };
 
   return (
     <Card
+      onClick={onClick}
       className={cn(
-        "p-5 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 transition-all duration-300 relative overflow-hidden group hover:shadow-xl",
+        "p-4 sm:p-5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-zinc-900/60 shadow-sm transition-all duration-200 relative overflow-hidden group hover:shadow-md",
+        onClick ? "cursor-pointer" : "",
         colorMap[color].glow
       )}
     >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">{title}</p>
-          <h3 className="text-2xl sm:text-3xl font-black text-white mt-1.5 tracking-tight">{value}</h3>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider truncate">
+            {title}
+          </p>
+          <h3 className="text-xl sm:text-2xl lg:text-3xl font-black text-zinc-900 dark:text-white mt-1 tracking-tight truncate">
+            {value}
+          </h3>
         </div>
-        <div className={cn("p-2.5 rounded-xl border shrink-0", colorMap[color].bg)}>
+        <div className={cn("p-2.5 rounded-xl border shrink-0 transition-transform group-hover:scale-105 duration-200 shadow-sm", colorMap[color].bg)}>
           <Icon className="h-5 w-5" />
         </div>
       </div>
 
-      <div className="mt-3.5 pt-3 border-t border-zinc-800/60 flex items-center justify-between text-xs text-zinc-400">
-        <span className="text-[11px] truncate mr-2">{description}</span>
+      <div className="mt-3.5 pt-3 border-t border-zinc-100 dark:border-zinc-800/60 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 gap-2">
+        <span className="text-[11px] truncate flex-1">{description}</span>
         {trend && (
           <span
             className={cn(
               "font-mono font-bold px-2 py-0.5 rounded-md text-[10px] shrink-0",
-              trendUp ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/15 text-rose-400 border border-rose-500/20"
+              trendUp
+                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+                : "bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/20"
             )}
           >
             {trend}

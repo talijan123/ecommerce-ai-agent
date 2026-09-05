@@ -15,9 +15,11 @@ import {
   User,
   ShieldCheck,
   CheckCircle,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { useMobileNav } from "@/context/MobileNavContext";
 
 const NAV_ITEMS = [
   {
@@ -38,21 +40,33 @@ const NAV_ITEMS = [
   },
 ];
 
-export function Sidebar() {
+interface SidebarInnerProps {
+  onNavClick?: () => void;
+  isMobile?: boolean;
+}
+
+function SidebarInner({ onNavClick, isMobile }: SidebarInnerProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { close } = useMobileNav();
+
+  const handleLinkClick = () => {
+    if (onNavClick) onNavClick();
+    if (isMobile) close();
+  };
 
   const handleLogout = () => {
     logout();
+    if (isMobile) close();
     router.push("/login");
   };
 
   return (
-    <aside className="w-64 border-r border-zinc-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xl flex flex-col h-screen sticky top-0 z-20 transition-colors">
+    <div className="flex flex-col h-full">
       {/* Brand Header */}
-      <div className="p-5 border-b border-zinc-200/80 dark:border-zinc-800/80 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3 group">
+      <div className="p-4 sm:p-5 border-b border-zinc-200/80 dark:border-zinc-800/80 flex items-center justify-between">
+        <Link href="/" onClick={handleLinkClick} className="flex items-center gap-3 group">
           <div className="h-9 w-9 rounded-xl gradient-blue-indigo flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform duration-200">
             <Bot className="h-5 w-5" />
           </div>
@@ -63,6 +77,18 @@ export function Sidebar() {
             <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">Merchant Admin</span>
           </div>
         </Link>
+
+        {/* Mobile Close Button */}
+        {isMobile && (
+          <button
+            type="button"
+            onClick={close}
+            aria-label="Close navigation drawer"
+            className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Navigation Links */}
@@ -77,6 +103,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={handleLinkClick}
               className={cn(
                 "flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200",
                 isActive
@@ -103,6 +130,7 @@ export function Sidebar() {
           </div>
           <Link
             href="/storefront"
+            onClick={handleLinkClick}
             className="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900/70 transition-all border border-transparent"
           >
             <div className="flex items-center gap-2.5">
@@ -114,6 +142,7 @@ export function Sidebar() {
 
           <Link
             href="/widget"
+            onClick={handleLinkClick}
             className="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900/70 transition-all border border-transparent"
           >
             <div className="flex items-center gap-2.5">
@@ -151,6 +180,7 @@ export function Sidebar() {
             </div>
 
             <button
+              type="button"
               onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors"
             >
@@ -161,6 +191,7 @@ export function Sidebar() {
         ) : (
           <Link
             href="/login"
+            onClick={handleLinkClick}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-white gradient-blue-indigo shadow-sm"
           >
             <User className="h-3.5 w-3.5" />
@@ -182,6 +213,39 @@ export function Sidebar() {
           Grounded Multi-Tenant Sync
         </p>
       </div>
-    </aside>
+    </div>
+  );
+}
+
+export function Sidebar() {
+  const { isOpen, close } = useMobileNav();
+
+  return (
+    <>
+      {/* 1. Desktop Static Sidebar */}
+      <aside className="hidden md:flex md:w-64 border-r border-zinc-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xl flex-col h-screen sticky top-0 z-20 transition-colors shrink-0">
+        <SidebarInner isMobile={false} />
+      </aside>
+
+      {/* 2. Mobile Responsive Slide-Over Drawer */}
+      {/* Backdrop */}
+      {isOpen && (
+        <div
+          onClick={close}
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden animate-in fade-in duration-200"
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Drawer Container */}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 shadow-2xl md:hidden transition-transform duration-300 ease-in-out flex flex-col",
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <SidebarInner isMobile={true} onNavClick={close} />
+      </aside>
+    </>
   );
 }
