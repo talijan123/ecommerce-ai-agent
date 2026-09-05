@@ -575,6 +575,7 @@ export default function DashboardOverviewPage() {
           isOpen={isTestWhatsAppOpen}
           onClose={() => setIsTestWhatsAppOpen(false)}
           storeName={activeStore.name}
+          storeId={activeStore.id}
           phoneNumberId={activeStore.whatsapp_phone_number_id}
         />
       )}

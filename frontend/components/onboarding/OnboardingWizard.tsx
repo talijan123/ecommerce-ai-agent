@@ -22,6 +22,9 @@ import {
   ChevronUp,
   X,
   Bot,
+  Zap,
+  Copy,
+  Check,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import confetti from "canvas-confetti";
@@ -31,6 +34,9 @@ import {
   CSVImportSummary,
   WhatsAppVerifyResponse,
   formatApiError,
+  DEFAULT_WHATSAPP_PHONE,
+  DEFAULT_WHATSAPP_CLEAN_PHONE,
+  getSandboxConnectUrl,
 } from "@/lib/api";
 import { Button } from "@/lib/ui";
 
@@ -89,12 +95,14 @@ export function OnboardingWizard({ isOpen, onClose, onComplete }: OnboardingWiza
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Step 3: WhatsApp Setup State
+  const [step3Mode, setStep3Mode] = useState<"sandbox" | "custom">("sandbox");
   const [phoneId, setPhoneId] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [isVerifyingWa, setIsVerifyingWa] = useState(false);
   const [waVerification, setWaVerification] = useState<WhatsAppVerifyResponse | null>(null);
   const [step3Error, setStep3Error] = useState<string | null>(null);
   const [showMetaGuide, setShowMetaGuide] = useState(false);
+  const [copiedConnect, setCopiedConnect] = useState(false);
 
   if (!isOpen) return null;
 
@@ -246,13 +254,24 @@ export function OnboardingWizard({ isOpen, onClose, onComplete }: OnboardingWiza
     if (onClose) onClose();
   };
 
-  // QR code deep link for completion
-  const targetPhone = waVerification?.display_phone_number || phoneId || "WhatsApp";
-  const cleanPhone = targetPhone.replace(/[^0-9]/g, "");
-  const testMsg = `Hi! I want to explore products and track orders at ${createdStore?.name || "the store"}.`;
-  const whatsappUrl = cleanPhone
-    ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(testMsg)}`
-    : `https://wa.me/?text=${encodeURIComponent(testMsg)}`;
+  const connectCommand = `CONNECT ${createdStore?.id || ""}`;
+  const sandboxConnectUrl = getSandboxConnectUrl(createdStore?.id || "");
+
+  const isCustomVerified = waVerification?.status === "connected" && (waVerification.display_phone_number || phoneId);
+  const targetPhone = isCustomVerified
+    ? (waVerification?.display_phone_number || phoneId).replace(/[^0-9]/g, "")
+    : DEFAULT_WHATSAPP_CLEAN_PHONE;
+
+  const customTestMsg = `Hi! I want to explore products and track orders at ${createdStore?.name || "the store"}.`;
+  const whatsappUrl = isCustomVerified
+    ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(customTestMsg)}`
+    : sandboxConnectUrl;
+
+  const handleCopyConnect = () => {
+    navigator.clipboard.writeText(connectCommand);
+    setCopiedConnect(true);
+    setTimeout(() => setCopiedConnect(false), 2500);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
@@ -627,7 +646,7 @@ export function OnboardingWizard({ isOpen, onClose, onComplete }: OnboardingWiza
         )}
 
         {/* ============================================================ */}
-        {/* STEP 3: CONNECT WHATSAPP CLOUD API */}
+        {/* STEP 3: WHATSAPP INTEGRATION & INSTANT SANDBOX */}
         {/* ============================================================ */}
         {currentStep === 3 && (
           <div className="space-y-5 animate-in fade-in">
@@ -635,12 +654,83 @@ export function OnboardingWizard({ isOpen, onClose, onComplete }: OnboardingWiza
               <div className="flex items-center gap-2 mb-1">
                 <MessageSquare className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 <h3 className="text-lg font-extrabold text-zinc-900 dark:text-white">
-                  Step 3: Connect WhatsApp Cloud API
+                  Step 3: WhatsApp Integration & Sandbox
                 </h3>
               </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Connect Meta WhatsApp Cloud API credentials to link your autonomous customer agent.
+                Choose how you want to test and deploy your autonomous AI agent.
               </p>
+            </div>
+
+            {/* Mode Selection Tabs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Option A: Instant Sandbox */}
+              <button
+                type="button"
+                onClick={() => setStep3Mode("sandbox")}
+                className={`p-3.5 rounded-2xl text-left border transition-all flex items-start gap-3 relative ${
+                  step3Mode === "sandbox"
+                    ? "bg-gradient-to-br from-emerald-500/10 via-blue-500/10 to-indigo-500/10 border-emerald-500/50 ring-2 ring-emerald-500/20 shadow-md"
+                    : "bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                }`}
+              >
+                <div
+                  className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
+                    step3Mode === "sandbox"
+                      ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/25"
+                      : "bg-zinc-200 dark:bg-zinc-800 text-zinc-500"
+                  }`}
+                >
+                  <Zap className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white">
+                      Instant AI Sandbox
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                      Recommended
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-tight">
+                    Zero Meta setup. Test your catalog on WhatsApp immediately with 1 click.
+                  </p>
+                </div>
+              </button>
+
+              {/* Option B: Custom Meta Cloud API */}
+              <button
+                type="button"
+                onClick={() => setStep3Mode("custom")}
+                className={`p-3.5 rounded-2xl text-left border transition-all flex items-start gap-3 relative ${
+                  step3Mode === "custom"
+                    ? "bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-500/50 ring-2 ring-blue-500/20 shadow-md"
+                    : "bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                }`}
+              >
+                <div
+                  className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
+                    step3Mode === "custom"
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-500/25"
+                      : "bg-zinc-200 dark:bg-zinc-800 text-zinc-500"
+                  }`}
+                >
+                  <Smartphone className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white">
+                      Custom Meta Cloud API
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 uppercase tracking-wide">
+                      Advanced
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-tight">
+                    Connect your own Meta Developer Phone Number ID & Access Token.
+                  </p>
+                </div>
+              </button>
             </div>
 
             {step3Error && (
@@ -650,92 +740,176 @@ export function OnboardingWizard({ isOpen, onClose, onComplete }: OnboardingWiza
               </div>
             )}
 
-            {/* Meta Guide Tooltip Accordion */}
-            <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setShowMetaGuide(!showMetaGuide)}
-                className="w-full p-3.5 flex items-center justify-between text-left text-xs font-bold text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <HelpCircle className="h-4 w-4 text-blue-500" />
-                  <span>Where to find Phone Number ID & Token in Meta Developers?</span>
-                </div>
-                {showMetaGuide ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </button>
-              {showMetaGuide && (
-                <div className="p-4 pt-1 border-t border-zinc-200 dark:border-zinc-800 text-[11px] text-zinc-500 dark:text-zinc-400 space-y-2">
-                  <p>
-                    1. Go to{" "}
+            {/* TAB CONTENT: OPTION A (INSTANT SANDBOX) */}
+            {step3Mode === "sandbox" && (
+              <div className="space-y-4 p-5 rounded-2xl bg-gradient-to-b from-emerald-500/5 to-transparent border border-emerald-500/20 animate-in fade-in">
+                <div className="flex flex-col sm:flex-row items-center gap-5">
+                  {/* QR Code */}
+                  <div className="p-3 bg-white rounded-2xl shadow-md border border-zinc-100 dark:border-zinc-800 shrink-0">
+                    <QRCodeSVG
+                      value={sandboxConnectUrl}
+                      size={130}
+                      level="M"
+                      includeMargin={false}
+                      fgColor="#0f172a"
+                    />
+                  </div>
+
+                  {/* Sandbox Info & Connect Link */}
+                  <div className="space-y-2.5 flex-1 min-w-0 text-center sm:text-left">
+                    <div>
+                      <div className="flex items-center justify-center sm:justify-start gap-1.5">
+                        <Sparkles className="h-4 w-4 text-emerald-500" />
+                        <h4 className="text-xs font-bold text-zinc-900 dark:text-white">
+                          Instant AI Demo on Shared WhatsApp Number
+                        </h4>
+                      </div>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                        Scan the QR code or click the button to pair your WhatsApp session instantly with{" "}
+                        <strong className="text-zinc-900 dark:text-white">{createdStore?.name || "your store"}</strong>.
+                      </p>
+                    </div>
+
+                    {/* Pre-formatted Command Pill */}
+                    <div className="p-2.5 rounded-xl bg-zinc-900 text-zinc-100 flex items-center justify-between gap-2 border border-zinc-800">
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-zinc-400 block font-mono">WhatsApp Connect Command:</span>
+                        <span className="text-xs font-mono font-bold text-emerald-400 truncate block">
+                          {connectCommand}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleCopyConnect}
+                        className="shrink-0 gap-1 text-[11px] py-1 px-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700"
+                      >
+                        {copiedConnect ? (
+                          <>
+                            <Check className="h-3 w-3 text-emerald-400" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* Launch WhatsApp Demo Link */}
                     <a
-                      href="https://developers.facebook.com/apps"
+                      href={sandboxConnectUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-500 underline font-bold"
+                      className="inline-flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-500/20 transition-all w-full sm:w-auto"
                     >
-                      developers.facebook.com/apps
-                    </a>{" "}
-                    and open your WhatsApp App.
-                  </p>
-                  <p>
-                    2. In the sidebar, navigate to <strong>WhatsApp &rarr; API Setup</strong> (or Quickstart).
-                  </p>
-                  <p>
-                    3. Copy the <strong>Phone number ID</strong> from Step 1 of API Setup.
-                  </p>
-                  <p>
-                    4. Generate a <strong>Temporary Access Token</strong> or create a System User Permanent Token in Business Manager.
-                  </p>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      <span>Launch Demo on WhatsApp</span>
+                    </a>
+                  </div>
                 </div>
-              )}
-            </div>
 
-            {/* Phone Number ID Input */}
-            <div>
-              <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                WhatsApp Phone Number ID <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. 104829104820194"
-                value={phoneId}
-                onChange={(e) => setPhoneId(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl text-xs sm:text-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 font-mono"
-              />
-            </div>
+                <div className="pt-2 border-t border-emerald-500/10 flex items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <span>
+                    No Meta credentials needed. You can link your custom Meta WhatsApp number anytime later from the store settings.
+                  </span>
+                </div>
+              </div>
+            )}
 
-            {/* Access Token Input */}
-            <div>
-              <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                WhatsApp Access Token (Bearer Token) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
-                required
-                placeholder="EAA..."
-                value={accessToken}
-                onChange={(e) => setAccessToken(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl text-xs sm:text-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 font-mono"
-              />
-            </div>
-
-            {/* Verification Result Banner */}
-            {waVerification && waVerification.status === "connected" && (
-              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3">
-                <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
-                <div className="text-xs text-emerald-900 dark:text-emerald-300 space-y-1">
-                  <p className="font-bold text-sm">Meta WhatsApp Cloud API Connected!</p>
-                  <p>
-                    Verified Business:{" "}
-                    <strong>{waVerification.verified_name || createdStore?.name}</strong>
-                  </p>
-                  {waVerification.display_phone_number && (
-                    <p className="font-mono text-[11px]">
-                      Display Phone: {waVerification.display_phone_number}
-                    </p>
+            {/* TAB CONTENT: OPTION B (CUSTOM META CLOUD API) */}
+            {step3Mode === "custom" && (
+              <div className="space-y-4 animate-in fade-in">
+                {/* Meta Guide Tooltip Accordion */}
+                <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowMetaGuide(!showMetaGuide)}
+                    className="w-full p-3.5 flex items-center justify-between text-left text-xs font-bold text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <HelpCircle className="h-4 w-4 text-blue-500" />
+                      <span>Where to find Phone Number ID & Token in Meta Developers?</span>
+                    </div>
+                    {showMetaGuide ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+                  {showMetaGuide && (
+                    <div className="p-4 pt-1 border-t border-zinc-200 dark:border-zinc-800 text-[11px] text-zinc-500 dark:text-zinc-400 space-y-2">
+                      <p>
+                        1. Go to{" "}
+                        <a
+                          href="https://developers.facebook.com/apps"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-500 underline font-bold"
+                        >
+                          developers.facebook.com/apps
+                        </a>{" "}
+                        and open your WhatsApp App.
+                      </p>
+                      <p>
+                        2. In the sidebar, navigate to <strong>WhatsApp &rarr; API Setup</strong> (or Quickstart).
+                      </p>
+                      <p>
+                        3. Copy the <strong>Phone number ID</strong> from Step 1 of API Setup.
+                      </p>
+                      <p>
+                        4. Generate a <strong>Temporary Access Token</strong> or create a System User Permanent Token in Business Manager.
+                      </p>
+                    </div>
                   )}
                 </div>
+
+                {/* Phone Number ID Input */}
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                    WhatsApp Phone Number ID <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 104829104820194"
+                    value={phoneId}
+                    onChange={(e) => setPhoneId(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl text-xs sm:text-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 font-mono"
+                  />
+                </div>
+
+                {/* Access Token Input */}
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                    WhatsApp Access Token (Bearer Token) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="EAA..."
+                    value={accessToken}
+                    onChange={(e) => setAccessToken(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl text-xs sm:text-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 font-mono"
+                  />
+                </div>
+
+                {/* Verification Result Banner */}
+                {waVerification && waVerification.status === "connected" && (
+                  <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                    <div className="text-xs text-emerald-900 dark:text-emerald-300 space-y-1">
+                      <p className="font-bold text-sm">Meta WhatsApp Cloud API Connected!</p>
+                      <p>
+                        Verified Business:{" "}
+                        <strong>{waVerification.verified_name || createdStore?.name}</strong>
+                      </p>
+                      {waVerification.display_phone_number && (
+                        <p className="font-mono text-[11px]">
+                          Display Phone: {waVerification.display_phone_number}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -753,7 +927,7 @@ export function OnboardingWizard({ isOpen, onClose, onComplete }: OnboardingWiza
               </Button>
 
               <div className="flex items-center gap-2">
-                {phoneId && accessToken && (!waVerification || waVerification.status !== "connected") && (
+                {step3Mode === "custom" && phoneId && accessToken && (!waVerification || waVerification.status !== "connected") && (
                   <Button
                     type="button"
                     variant="secondary"
@@ -784,7 +958,7 @@ export function OnboardingWizard({ isOpen, onClose, onComplete }: OnboardingWiza
                   className="gap-2 text-xs font-bold"
                 >
                   <Sparkles className="h-4 w-4" />
-                  <span>Complete Setup & Launch</span>
+                  <span>Finish Setup & Launch</span>
                 </Button>
               </div>
             </div>
@@ -813,7 +987,7 @@ export function OnboardingWizard({ isOpen, onClose, onComplete }: OnboardingWiza
             <div className="p-6 rounded-3xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 max-w-sm mx-auto shadow-inner flex flex-col items-center">
               <span className="text-xs font-bold text-zinc-900 dark:text-white mb-3 flex items-center gap-1.5">
                 <Smartphone className="h-4 w-4 text-emerald-500" />
-                Scan to Send First WhatsApp Test Turn
+                {isCustomVerified ? "Scan to Chat on Your WhatsApp" : "Scan to Launch Instant WhatsApp Demo"}
               </span>
 
               <div className="p-3.5 bg-white rounded-2xl shadow-md border border-zinc-100">
@@ -825,6 +999,26 @@ export function OnboardingWizard({ isOpen, onClose, onComplete }: OnboardingWiza
                   fgColor="#0f172a"
                 />
               </div>
+
+              {!isCustomVerified && (
+                <div className="mt-3 w-full p-2 rounded-xl bg-zinc-900 text-zinc-200 text-left flex items-center justify-between gap-1 border border-zinc-800">
+                  <div className="min-w-0">
+                    <span className="text-[9px] text-zinc-400 block font-mono">Sandbox Command:</span>
+                    <span className="text-[11px] font-mono font-bold text-emerald-400 truncate block">
+                      {connectCommand}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopyConnect}
+                    className="shrink-0 text-[10px] h-7 px-2 text-zinc-300 hover:text-white"
+                  >
+                    {copiedConnect ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                  </Button>
+                </div>
+              )}
 
               <div className="mt-4 w-full">
                 <a

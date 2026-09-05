@@ -101,6 +101,23 @@ export interface WhatsAppVerifyResponse {
   status_code?: number;
 }
 
+export interface WhatsAppSandboxInfo {
+  sandbox_phone_number: string;
+  clean_phone_number: string;
+  connect_command_template: string;
+  active_sessions_count: number;
+  is_configured: boolean;
+}
+
+export const DEFAULT_WHATSAPP_PHONE = process.env.NEXT_PUBLIC_DEFAULT_WHATSAPP_PHONE || "+15551433435";
+export const DEFAULT_WHATSAPP_CLEAN_PHONE = DEFAULT_WHATSAPP_PHONE.replace(/[^0-9]/g, "");
+
+export function getSandboxConnectUrl(storeId: string, phone: string = DEFAULT_WHATSAPP_CLEAN_PHONE): string {
+  const clean = (phone || DEFAULT_WHATSAPP_CLEAN_PHONE).replace(/[^0-9]/g, "");
+  const text = `CONNECT ${storeId}`;
+  return `https://wa.me/${clean}?text=${encodeURIComponent(text)}`;
+}
+
 export interface CSVImportSummary {
   total_rows: number;
   imported: number;
@@ -395,6 +412,23 @@ export const api = {
     if (sessionId) params.session_id = sessionId;
     if (includeAlreadySent) params.include_already_sent = "true";
     const res = await apiClient.post("/api/v1/admin/recovery/trigger-whatsapp", null, { params });
+    return res.data;
+  },
+
+  // ----------------------------------------
+  // WhatsApp Sandbox APIs
+  // ----------------------------------------
+  async getWhatsAppSandboxInfo(): Promise<WhatsAppSandboxInfo> {
+    const res = await apiClient.get<WhatsAppSandboxInfo>("/api/v1/whatsapp/sandbox-info");
+    return res.data;
+  },
+
+  async simulateSandboxMessage(senderPhone: string, messageText: string, storeId?: string) {
+    const res = await apiClient.post("/api/v1/whatsapp/sandbox/simulate-message", {
+      sender_phone: senderPhone,
+      message_text: messageText,
+      store_id: storeId,
+    });
     return res.data;
   },
 

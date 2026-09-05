@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     WHATSAPP_PHONE_NUMBER_ID: str = Field(default="")
     WHATSAPP_VERIFY_TOKEN: str = Field(default="autocommerce_wa_verify_token_123")
     WHATSAPP_API_VERSION: str = Field(default="v21.0")
+    DEFAULT_WHATSAPP_PHONE: str = Field(default="+15551433435")
 
     # Shopify Store API Settings (Live E-Commerce Integration)
     SHOPIFY_STORE_URL: str = Field(default="")

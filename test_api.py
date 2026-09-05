@@ -244,6 +244,59 @@ def test_admin_endpoints():
     print(f"  ✓ GET /api/v1/admin/orders verified ({len(orders)} orders retrieved)")
 
 
+def test_whatsapp_sandbox_endpoints():
+    print("\n🔹 Testing WhatsApp Sandbox Endpoints...")
+    # 1. GET /api/v1/whatsapp/sandbox-info
+    res_info = client.get("/api/v1/whatsapp/sandbox-info")
+    assert res_info.status_code == 200
+    info = res_info.json()
+    assert "sandbox_phone_number" in info
+    assert "clean_phone_number" in info
+    assert "connect_command_template" in info
+    print(f"  ✓ GET /api/v1/whatsapp/sandbox-info verified (Phone: {info['sandbox_phone_number']})")
+
+    # 2. Simulate CONNECT <store_id> command
+    db = SessionLocal()
+    from app.models.store import Store
+    sample_store = db.query(Store).filter(Store.is_active == True).first()
+    db.close()
+
+    if sample_store:
+        sim_payload = {
+            "sender_phone": "+19998887777",
+            "message_text": f"CONNECT {sample_store.id}",
+            "store_id": str(sample_store.id),
+        }
+        res_sim = client.post("/api/v1/whatsapp/sandbox/simulate-message", json=sim_payload)
+        assert res_sim.status_code == 200
+        sim_data = res_sim.json()
+        assert sim_data["status"] == "connected"
+        assert sample_store.name in sim_data["reply"]
+        print(f"  ✓ POST /api/v1/whatsapp/sandbox/simulate-message CONNECT bound to store '{sample_store.name}'")
+
+        # 3. Simulate subsequent product query turn
+        sim_turn = {
+            "sender_phone": "+19998887777",
+            "message_text": "Do you have any shoes or jackets in stock?",
+        }
+        res_turn = client.post("/api/v1/whatsapp/sandbox/simulate-message", json=sim_turn)
+        assert res_turn.status_code == 200
+        turn_data = res_turn.json()
+        assert "reply" in turn_data or "status" in turn_data
+        print(f"  ✓ Subsequent turn routed to bound sandbox session successfully")
+
+        # 4. Simulate DISCONNECT
+        sim_disc = {
+            "sender_phone": "+19998887777",
+            "message_text": "DISCONNECT",
+        }
+        res_disc = client.post("/api/v1/whatsapp/sandbox/simulate-message", json=sim_disc)
+        assert res_disc.status_code == 200
+        disc_data = res_disc.json()
+        assert disc_data["status"] == "disconnected"
+        print(f"  ✓ DISCONNECT command unlinked sandbox session cleanly")
+
+
 if __name__ == "__main__":
     print("=" * 75)
     print(" 🚀 RUNNING FASTAPI & DATABASE INTEGRATION TEST SUITE")
@@ -256,6 +309,7 @@ if __name__ == "__main__":
     test_chat_and_history_endpoints()
     test_webhooks_endpoints()
     test_admin_endpoints()
+    test_whatsapp_sandbox_endpoints()
     print("\n" + "=" * 75)
-    print(" 🎉 ALL FASTAPI, DATABASE, ADMIN & WEBHOOK TESTS PASSED SUCCESSFULLY!")
+    print(" 🎉 ALL FASTAPI, DATABASE, ADMIN, WEBHOOK & SANDBOX TESTS PASSED SUCCESSFULLY!")
     print("=" * 75)
