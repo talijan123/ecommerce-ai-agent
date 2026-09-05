@@ -102,7 +102,7 @@ export function Sidebar() {
             Storefront & Testing
           </div>
           <Link
-            href="/"
+            href="/storefront"
             className="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-900/70 transition-all border border-transparent"
           >
             <div className="flex items-center gap-2.5">
