@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     # CORS Origins
     CORS_ORIGINS: List[str] = Field(default=["*"])
 
+    # Super-Admin Privileges & Platform Control Access
+    SUPER_ADMIN_EMAILS: Union[str, List[str]] = Field(
+        default="aroobjan965@gmail.com,admin@autocommerce.ai,owner@store.com,talal@example.com"
+    )
+
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def assemble_database_url(cls, v: str) -> str:
@@ -80,6 +85,27 @@ class Settings(BaseSettings):
             if not v.startswith("["):
                 return [i.strip() for i in v.split(",") if i.strip()]
         return v
+
+    @field_validator("SUPER_ADMIN_EMAILS", mode="before")
+    @classmethod
+    def assemble_super_admin_emails(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            if v.startswith("["):
+                import json
+                try:
+                    return [str(e).strip().lower() for e in json.loads(v) if str(e).strip()]
+                except Exception:
+                    pass
+            emails = [i.strip().lower() for i in v.split(",") if i.strip()]
+            if "aroobjan965@gmail.com" not in emails:
+                emails.append("aroobjan965@gmail.com")
+            return emails
+        elif isinstance(v, (list, set, tuple)):
+            emails = [str(i).strip().lower() for i in v if str(i).strip()]
+            if "aroobjan965@gmail.com" not in emails:
+                emails.append("aroobjan965@gmail.com")
+            return emails
+        return ["aroobjan965@gmail.com", "admin@autocommerce.ai", "owner@store.com", "talal@example.com"]
 
     model_config = SettingsConfigDict(
         env_file=".env",

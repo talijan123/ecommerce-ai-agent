@@ -54,9 +54,13 @@ export default function SuperAdminPage() {
   const [ticketStatusFilter, setTicketStatusFilter] = useState("All");
   const [updatingTicketId, setUpdatingTicketId] = useState<string | null>(null);
 
+  const superAdminList = (process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAILS || "aroobjan965@gmail.com,talal@example.com,admin@autocommerce.ai,owner@store.com")
+    .split(",")
+    .map((e) => e.trim().toLowerCase());
+
   const isSuperAdmin =
     user?.role === "super_admin" ||
-    (user?.email && ["talal@example.com", "admin@autocommerce.ai", "owner@store.com"].includes(user.email.toLowerCase()));
+    (user?.email && (superAdminList.includes(user.email.toLowerCase()) || user.email.toLowerCase() === "aroobjan965@gmail.com"));
 
   async function loadSuperAdminData() {
     try {

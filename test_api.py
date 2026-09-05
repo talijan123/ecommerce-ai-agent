@@ -393,6 +393,80 @@ def test_store_integrations_and_tickets():
     print(f"  ✓ PATCH /api/v1/super-admin/tickets/{created_ticket['id'][:8]} resolved successfully")
 
 
+def test_super_admin_aroobjan_access():
+    print("\n🔹 Testing Super-Admin Privileges for aroobjan965@gmail.com...")
+    from app.core.security import create_access_token, get_password_hash
+    from app.models.user import User
+
+    db = SessionLocal()
+    # 1. Verify user in database
+    aroob_user = db.query(User).filter(User.email == "aroobjan965@gmail.com").first()
+    if not aroob_user:
+        aroob_user = User(
+            email="aroobjan965@gmail.com",
+            hashed_password=get_password_hash("SuperAdmin2026!#"),
+            full_name="Aroob Jan",
+            is_verified=True,
+            role="super_admin",
+        )
+        db.add(aroob_user)
+        db.commit()
+        db.refresh(aroob_user)
+
+    assert aroob_user.role == "super_admin", f"Expected role 'super_admin', got '{aroob_user.role}'"
+    aroob_user_id = str(aroob_user.id)
+    aroob_email = str(aroob_user.email)
+
+    # 2. Verify non-superadmin user for comparison
+    test_merchant = db.query(User).filter(User.email == "test_regular_merchant@example.com").first()
+    if not test_merchant:
+        test_merchant = User(
+            email="test_regular_merchant@example.com",
+            hashed_password=get_password_hash("Password123!"),
+            full_name="Regular Merchant",
+            is_verified=True,
+            role="merchant",
+        )
+        db.add(test_merchant)
+        db.commit()
+        db.refresh(test_merchant)
+    else:
+        test_merchant.role = "merchant"
+        db.commit()
+        db.refresh(test_merchant)
+
+    merchant_user_id = str(test_merchant.id)
+    merchant_email = str(test_merchant.email)
+    db.close()
+
+    # Generate tokens
+    aroob_token = create_access_token({"sub": aroob_user_id, "email": aroob_email})
+    aroob_auth_headers = {"Authorization": f"Bearer {aroob_token}"}
+
+    merchant_token = create_access_token({"sub": merchant_user_id, "email": merchant_email})
+    merchant_auth_headers = {"Authorization": f"Bearer {merchant_token}"}
+
+    # 3. Verify aroobjan965@gmail.com access to /api/v1/super-admin/stats
+    res_stats = client.get("/api/v1/super-admin/stats", headers=aroob_auth_headers)
+    assert res_stats.status_code == 200, f"aroobjan965@gmail.com should have 200 OK access to stats, got {res_stats.status_code}"
+    print("  ✓ GET /api/v1/super-admin/stats returned 200 OK for aroobjan965@gmail.com")
+
+    # 4. Verify aroobjan965@gmail.com access to /api/v1/super-admin/tenants
+    res_tenants = client.get("/api/v1/super-admin/tenants", headers=aroob_auth_headers)
+    assert res_tenants.status_code == 200, f"aroobjan965@gmail.com should have 200 OK access to tenants, got {res_tenants.status_code}"
+    print("  ✓ GET /api/v1/super-admin/tenants returned 200 OK for aroobjan965@gmail.com")
+
+    # 5. Verify aroobjan965@gmail.com access to /api/v1/super-admin/tickets
+    res_tickets = client.get("/api/v1/super-admin/tickets", headers=aroob_auth_headers)
+    assert res_tickets.status_code == 200, f"aroobjan965@gmail.com should have 200 OK access to tickets, got {res_tickets.status_code}"
+    print("  ✓ GET /api/v1/super-admin/tickets returned 200 OK for aroobjan965@gmail.com")
+
+    # 6. Verify unauthorized regular merchant receives 403 Forbidden
+    res_unauth = client.get("/api/v1/super-admin/stats", headers=merchant_auth_headers)
+    assert res_unauth.status_code == 403, f"Regular merchant should receive 403 Forbidden, got {res_unauth.status_code}"
+    print("  ✓ Non-admin merchant correctly blocked with 403 Forbidden")
+
+
 if __name__ == "__main__":
     print("=" * 75)
     print(" 🚀 RUNNING FASTAPI & DATABASE INTEGRATION TEST SUITE")
@@ -407,6 +481,7 @@ if __name__ == "__main__":
     test_admin_endpoints()
     test_whatsapp_sandbox_endpoints()
     test_store_integrations_and_tickets()
+    test_super_admin_aroobjan_access()
     print("\n" + "=" * 75)
     print(" 🎉 ALL FASTAPI, DATABASE, ADMIN, WEBHOOK, INTEGRATION & SUPER-ADMIN TESTS PASSED!")
     print("=" * 75)

