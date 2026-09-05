@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { AuthProvider } from "@/context/AuthContext";
-import { ChatWidget } from "@/components/chat/ChatWidget";
 import { BackToTop } from "@/components/BackToTop";
 
 export const metadata: Metadata = {
@@ -50,8 +49,6 @@ export default function RootLayout({
             {children}
             {/* Floating Smooth Back to Top Action Button */}
             <BackToTop />
-            {/* Floating Customer AI Chat Widget visible globally */}
-            <ChatWidget />
           </ThemeProvider>
         </AuthProvider>
       </body>

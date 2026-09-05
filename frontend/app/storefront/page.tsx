@@ -31,6 +31,7 @@ import { api, Product } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { getProductImage } from "@/lib/productImages";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { ChatWidget } from "@/components/chat/ChatWidget";
 
 interface CartItem {
   productId: number;
@@ -821,6 +822,9 @@ export default function StorefrontPage() {
           </div>
         </div>
       </footer>
+
+      {/* Floating Customer AI Chat Widget visible on storefront */}
+      <ChatWidget />
     </div>
   );
 }
