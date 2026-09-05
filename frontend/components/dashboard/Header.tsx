@@ -92,14 +92,14 @@ export function Header({
       </div>
 
       {/* Right Controls & Quick Actions */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+      <div className="flex items-center gap-3 sm:gap-4 shrink-0">
         {/* Super Admin Portal Quick Link */}
         {isSuperAdmin && (
           <Link
             href="/super-admin"
-            className="inline-flex items-center gap-1.5 text-xs bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/30 hover:bg-purple-500/20 px-2.5 sm:px-3 h-8 sm:h-9 font-bold rounded-xl transition-all"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800 transition-colors shrink-0 whitespace-nowrap shadow-sm"
           >
-            <ShieldCheck className="h-3.5 w-3.5" />
+            <ShieldCheck className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
             <span className="hidden sm:inline">Super Admin</span>
             <span className="sm:hidden">Admin</span>
           </Link>
@@ -112,9 +112,9 @@ export function Header({
             variant="outline"
             size="sm"
             onClick={onOpenSupportTicket}
-            className="gap-1.5 text-xs text-zinc-700 dark:text-zinc-300 border-zinc-300 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 px-2.5 sm:px-3 h-8 sm:h-9 font-semibold"
+            className="gap-1.5 text-xs text-zinc-700 dark:text-zinc-300 border-zinc-300 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 px-2.5 sm:px-3 h-8 sm:h-9 font-semibold shrink-0"
           >
-            <LifeBuoy className="h-3.5 w-3.5 text-blue-500" />
+            <LifeBuoy className="h-3.5 w-3.5 text-blue-500 shrink-0" />
             <span className="hidden sm:inline">Support</span>
           </Button>
         )}
@@ -126,9 +126,9 @@ export function Header({
             variant="outline"
             size="sm"
             onClick={onOpenWhatsAppTest}
-            className="gap-1.5 text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 px-2.5 sm:px-3 h-8 sm:h-9 font-bold"
+            className="gap-1.5 text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 px-2.5 sm:px-3 h-8 sm:h-9 font-bold shrink-0"
           >
-            <QrCode className="h-3.5 w-3.5" />
+            <QrCode className="h-3.5 w-3.5 shrink-0" />
             <span className="hidden sm:inline">Test WhatsApp</span>
             <span className="sm:hidden">Test</span>
           </Button>
@@ -138,15 +138,18 @@ export function Header({
         <Badge
           variant={isBackendHealthy ? "success" : isBackendHealthy === false ? "destructive" : "secondary"}
           dot={isBackendHealthy === true}
-          className="hidden lg:inline-flex py-1 px-3 text-[11px]"
+          className="hidden lg:inline-flex py-1 px-3 text-[11px] shrink-0"
         >
-          <Activity className="h-3 w-3" />
+          <Activity className="h-3 w-3 shrink-0" />
           {isBackendHealthy === null
             ? "Checking..."
             : isBackendHealthy
             ? "API Operational"
             : "API Offline"}
         </Badge>
+
+        {/* Subtle Visual Divider */}
+        <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block" />
 
         {/* Theme Toggle Button */}
         <ThemeToggle showDropdown={false} />
@@ -158,9 +161,9 @@ export function Header({
             size="sm"
             onClick={onRefresh}
             aria-label="Refresh Dashboard Data"
-            className="gap-1.5 text-xs p-2 sm:px-3 h-8 sm:h-9"
+            className="gap-1.5 text-xs p-2 sm:px-3 h-8 sm:h-9 shrink-0"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
+            <RefreshCw className="h-3.5 w-3.5 shrink-0" />
             <span className="hidden md:inline">Refresh</span>
           </Button>
         )}
@@ -171,9 +174,9 @@ export function Header({
             variant="gradient"
             size="sm"
             onClick={onOpenSimulator}
-            className="gap-1.5 text-xs px-2.5 sm:px-3.5 h-8 sm:h-9 font-bold"
+            className="gap-1.5 text-xs px-2.5 sm:px-3.5 h-8 sm:h-9 font-bold shrink-0"
           >
-            <Zap className="h-3.5 w-3.5" />
+            <Zap className="h-3.5 w-3.5 shrink-0" />
             <span className="hidden sm:inline">Webhooks</span>
           </Button>
         )}
