@@ -10,6 +10,7 @@ class ChatRequest(BaseModel):
     session_id: str = Field(..., description="Unique chat session or thread ID", min_length=1)
     message: str = Field(..., description="Natural language customer query", min_length=1)
     customer_email: Optional[str] = Field(None, description="Optional customer email for auto-identification")
+    store_id: Optional[str] = Field(None, description="Optional tenant store UUID")
 
 
 class ToolInvocationLog(BaseModel):

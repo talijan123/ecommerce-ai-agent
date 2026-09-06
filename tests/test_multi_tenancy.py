@@ -456,6 +456,52 @@ class TestMultiTenancyArchitecture(unittest.TestCase):
             self.assertEqual(chats[0].store_id, self.store_a.id)
             self.assertEqual(chats[1].store_id, self.store_a.id)
 
+    def test_admin_conversations_api_strict_tenant_scoping_and_empty_state(self):
+        """Verify /api/v1/admin/conversations and /api/v1/chat/history strictly isolate logs per store_id and return [] for fresh stores."""
+        session_a = f"sess_a_{self.unique_suffix}"
+        session_b = f"sess_b_{self.unique_suffix}"
+
+        # Seed chat for Store A
+        msg_a1 = ChatHistory(session_id=session_a, role="user", content="Where is order A?", store_id=self.store_a.id)
+        msg_a2 = ChatHistory(session_id=session_a, role="assistant", content="Order A is in transit.", store_id=self.store_a.id)
+
+        # Seed chat for Store B
+        msg_b1 = ChatHistory(session_id=session_b, role="user", content="Where is order B?", store_id=self.store_b.id)
+        msg_b2 = ChatHistory(session_id=session_b, role="assistant", content="Order B is delivered.", store_id=self.store_b.id)
+
+        self.db.add_all([msg_a1, msg_a2, msg_b1, msg_b2])
+        self.db.commit()
+
+        # 1. Store A queries conversations
+        resp_a = self.client.get(f"/api/v1/admin/conversations?store_id={self.store_a.id}")
+        self.assertEqual(resp_a.status_code, 200)
+        convs_a = resp_a.json()
+        self.assertEqual(len(convs_a), 1)
+        self.assertEqual(convs_a[0]["session_id"], session_a)
+
+        # 2. Store B queries conversations
+        resp_b = self.client.get(f"/api/v1/admin/conversations?store_id={self.store_b.id}")
+        self.assertEqual(resp_b.status_code, 200)
+        convs_b = resp_b.json()
+        self.assertEqual(len(convs_b), 1)
+        self.assertEqual(convs_b[0]["session_id"], session_b)
+
+        # 3. Store Inactive (brand new store with 0 chats) queries conversations -> returns []
+        resp_fresh = self.client.get(f"/api/v1/admin/conversations?store_id={self.store_inactive.id}")
+        self.assertEqual(resp_fresh.status_code, 200)
+        convs_fresh = resp_fresh.json()
+        self.assertEqual(convs_fresh, [])
+
+        # 4. Store A queries history for session A -> 2 messages
+        resp_hist_a = self.client.get(f"/api/v1/chat/history/{session_a}?store_id={self.store_a.id}")
+        self.assertEqual(resp_hist_a.status_code, 200)
+        self.assertEqual(len(resp_hist_a.json()), 2)
+
+        # 5. Store B attempts to query history for session A -> returns [] (no leak)
+        resp_hist_leak = self.client.get(f"/api/v1/chat/history/{session_a}?store_id={self.store_b.id}")
+        self.assertEqual(resp_hist_leak.status_code, 200)
+        self.assertEqual(resp_hist_leak.json(), [])
+
 
 if __name__ == "__main__":
     unittest.main()

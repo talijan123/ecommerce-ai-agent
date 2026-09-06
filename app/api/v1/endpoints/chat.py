@@ -1,9 +1,6 @@
-"""
-Chat Endpoints: Core conversational interface for customers and frontend widgets.
-"""
-
+import uuid
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -33,6 +30,7 @@ def send_chat_message(
             session_id=payload.session_id,
             user_message=payload.message,
             customer_email=payload.customer_email,
+            store_id=payload.store_id,
         )
 
         formatted_tools = [
@@ -66,15 +64,22 @@ def send_chat_message(
     "/chat/history/{session_id}",
     response_model=List[ChatHistoryItem],
     summary="Retrieve session chat history",
-    description="Fetches all previous messages and tool events recorded for the given session ID."
+    description="Fetches all previous messages and tool events recorded for the given session ID, optionally filtered by tenant store_id."
 )
 def get_chat_history(
     session_id: str,
+    store_id: Optional[str] = Query(None, description="Optional tenant store UUID filter"),
     db: Session = Depends(get_db),
 ):
-    records = db.query(ChatHistory).filter(
-        ChatHistory.session_id == session_id
-    ).order_by(ChatHistory.created_at.asc()).all()
+    query = db.query(ChatHistory).filter(ChatHistory.session_id == session_id)
+    if store_id:
+        try:
+            parsed_uuid = uuid.UUID(store_id.strip())
+            query = query.filter(ChatHistory.store_id == parsed_uuid)
+        except (ValueError, AttributeError):
+            return []
+
+    records = query.order_by(ChatHistory.created_at.asc()).all()
 
     return [
         ChatHistoryItem(

@@ -34,6 +34,12 @@ const NAV_ITEMS = [
     icon: Package,
   },
   {
+    title: "AI Bot Playground",
+    href: "/dashboard/ai-bot",
+    icon: Bot,
+    badge: "Agent",
+  },
+  {
     title: "AI Chat Logs & Tools",
     href: "/dashboard/conversations",
     icon: MessageSquare,

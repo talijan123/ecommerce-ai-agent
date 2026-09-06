@@ -49,6 +49,7 @@ def run_agent_turn(
     session_id: str,
     user_message: str,
     customer_email: Optional[str] = None,
+    store_id: Optional[Any] = None,
     max_turns: int = 5,
 ) -> Tuple[str, List[Dict[str, Any]], bool]:
     """
@@ -59,11 +60,20 @@ def run_agent_turn(
         session_id: Conversation session identifier.
         user_message: Natural language customer query.
         customer_email: Optional customer email for session context.
+        store_id: Optional tenant store UUID for multi-tenant data isolation.
         max_turns: Maximum tool execution turns to prevent infinite loops.
 
     Returns:
         Tuple of (response_text, list_of_tool_invocations, success_flag)
     """
+    import uuid as _uuid_mod
+    parsed_store_uuid = None
+    if store_id:
+        try:
+            parsed_store_uuid = _uuid_mod.UUID(str(store_id).strip())
+        except (ValueError, AttributeError):
+            parsed_store_uuid = None
+
     chat_service = ChatService(db)
     client = get_openai_client()
 
@@ -73,10 +83,10 @@ def run_agent_turn(
         full_user_input = f"{user_message} (My email is: {customer_email})"
 
     # Fetch prior conversation history from database
-    prior_messages = chat_service.get_history(session_id, limit=12)
+    prior_messages = chat_service.get_history(session_id, store_id=parsed_store_uuid, limit=12)
 
     # Persist the new user query
-    chat_service.add_message(session_id=session_id, role="user", content=full_user_input)
+    chat_service.add_message(session_id=session_id, role="user", content=full_user_input, store_id=parsed_store_uuid)
 
     # Build prompt messages array
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -91,7 +101,7 @@ def run_agent_turn(
             "⚠️ [API Notice]: Neither GROQ_API_KEY nor OPENAI_API_KEY is configured in the environment. "
             "Please configure your API key in environment variables to enable live AI responses."
         )
-        chat_service.add_message(session_id=session_id, role="assistant", content=fallback_msg)
+        chat_service.add_message(session_id=session_id, role="assistant", content=fallback_msg, store_id=parsed_store_uuid)
         return fallback_msg, [], True
 
     turn = 0
@@ -130,6 +140,7 @@ def run_agent_turn(
                 role="assistant",
                 content=response_message.content,
                 tool_calls=tool_calls_dict,
+                store_id=parsed_store_uuid,
             )
 
             # Append to prompt messages
@@ -143,7 +154,7 @@ def run_agent_turn(
                     args = {}
 
                 # Execute database tool
-                tool_result = execute_tool_with_db(db, func_name, args)
+                tool_result = execute_tool_with_db(db, func_name, args, store_id=parsed_store_uuid)
 
                 tools_invoked_log.append({
                     "tool_name": func_name,
@@ -158,6 +169,7 @@ def run_agent_turn(
                     content=json.dumps(tool_result),
                     tool_call_id=tc.id,
                     name=func_name,
+                    store_id=parsed_store_uuid,
                 )
 
                 # Append tool result to context
@@ -173,7 +185,7 @@ def run_agent_turn(
 
         # Final assistant answer produced
         final_answer = response_message.content or ""
-        chat_service.add_message(session_id=session_id, role="assistant", content=final_answer)
+        chat_service.add_message(session_id=session_id, role="assistant", content=final_answer, store_id=parsed_store_uuid)
         return final_answer, tools_invoked_log, True
 
     timeout_msg = "I'm sorry, I was unable to complete your request due to an execution limit."

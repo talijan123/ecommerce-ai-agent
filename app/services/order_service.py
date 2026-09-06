@@ -13,19 +13,23 @@ class OrderService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_order_by_id_or_number(self, order_identifier: str) -> Dict[str, Any]:
+    def get_order_by_id_or_number(self, order_identifier: str, store_id: Optional[Any] = None) -> Dict[str, Any]:
         """
-        Lookup order by order number (or ID) cleanly handling prefixes like '#'.
+        Lookup order by order number (or ID) cleanly handling prefixes like '#', optionally filtered by store_id.
         """
         cleaned_id = re.sub(r"[^\w-]", "", order_identifier).lstrip("#").strip()
 
-        order = self.db.query(Order).filter(
+        query = self.db.query(Order).filter(
             or_(
                 Order.order_number.ilike(cleaned_id),
                 Order.order_number.ilike(f"#{cleaned_id}"),
                 Order.order_number == cleaned_id,
             )
-        ).first()
+        )
+        if store_id is not None:
+            query = query.filter(Order.store_id == store_id)
+
+        order = query.first()
 
         if not order:
             return {

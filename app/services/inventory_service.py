@@ -13,9 +13,9 @@ class InventoryService:
     def __init__(self, db: Session):
         self.db = db
 
-    def check_inventory(self, product_name: str, size: Optional[str] = None) -> List[Dict[str, Any]]:
+    def check_inventory(self, product_name: str, size: Optional[str] = None, store_id: Optional[Any] = None) -> List[Dict[str, Any]]:
         """
-        Check product stock, price, and variant availability.
+        Check product stock, price, and variant availability, optionally filtered by store_id.
         If requested size is out of stock, automatically finds available alternative sizes and related products.
         """
         query_text = product_name.strip()
@@ -31,11 +31,18 @@ class InventoryService:
             filters.append(Product.title.ilike(f"%{word}%"))
             filters.append(Product.description.ilike(f"%{word}%"))
 
-        matching_products = self.db.query(Product).filter(or_(*filters)).all()
+        query = self.db.query(Product).filter(or_(*filters))
+        if store_id is not None:
+            query = query.filter(Product.store_id == store_id)
+
+        matching_products = query.all()
 
         if not matching_products:
             # Return category suggestions
-            all_categories = [c[0] for c in self.db.query(Product.category).distinct().all()]
+            cat_query = self.db.query(Product.category).distinct()
+            if store_id is not None:
+                cat_query = cat_query.filter(Product.store_id == store_id)
+            all_categories = [c[0] for c in cat_query.all() if c[0]]
             return [{
                 "success": False,
                 "query": product_name,

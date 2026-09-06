@@ -2,7 +2,7 @@
 OpenAI Tool Schemas and Database-Injected Execution Dispatcher.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from app.services.order_service import OrderService
 from app.services.inventory_service import InventoryService
@@ -106,9 +106,9 @@ SUPABASE_TOOLS: List[Dict[str, Any]] = [
 ]
 
 
-def execute_tool_with_db(db: Session, tool_name: str, arguments: Dict[str, Any]) -> Any:
+def execute_tool_with_db(db: Session, tool_name: str, arguments: Dict[str, Any], store_id: Optional[Any] = None) -> Any:
     """
-    Execute a tool against the database using the appropriate service instance.
+    Execute a tool against the database using the appropriate service instance with optional tenant store_id filtering.
     """
     order_service = OrderService(db)
     inventory_service = InventoryService(db)
@@ -116,16 +116,16 @@ def execute_tool_with_db(db: Session, tool_name: str, arguments: Dict[str, Any])
 
     if tool_name in ("get_order_status", "track_order"):
         order_id = arguments.get("order_id", "")
-        return order_service.get_order_by_id_or_number(order_id)
+        return order_service.get_order_by_id_or_number(order_id, store_id=store_id)
 
     elif tool_name in ("check_product_inventory", "check_product_stock"):
         product_name = arguments.get("product_name", "")
         size = arguments.get("size")
-        return inventory_service.check_inventory(product_name, size)
+        return inventory_service.check_inventory(product_name, size, store_id=store_id)
 
     elif tool_name == "apply_cart_recovery_discount":
         customer_email = arguments.get("customer_email", "")
-        return cart_service.apply_cart_recovery_discount(customer_email)
+        return cart_service.apply_cart_recovery_discount(customer_email, store_id=store_id)
 
     else:
         return {"error": f"Tool '{tool_name}' is not recognized or supported."}

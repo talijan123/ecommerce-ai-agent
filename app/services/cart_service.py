@@ -11,15 +11,19 @@ class CartService:
     def __init__(self, db: Session):
         self.db = db
 
-    def apply_cart_recovery_discount(self, customer_email: str) -> Dict[str, Any]:
+    def apply_cart_recovery_discount(self, customer_email: str, store_id: Optional[Any] = None) -> Dict[str, Any]:
         """
-        Check for an abandoned shopping cart session by customer email and return discount details.
+        Check for an abandoned shopping cart session by customer email and return discount details, optionally filtered by store_id.
         """
         cleaned_email = customer_email.strip().lower()
 
-        session = self.db.query(CartSession).filter(
+        query = self.db.query(CartSession).filter(
             CartSession.customer_email.ilike(cleaned_email)
-        ).first()
+        )
+        if store_id is not None:
+            query = query.filter(CartSession.store_id == store_id)
+
+        session = query.first()
 
         if not session:
             return {

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import {
   MessageSquare,
   Search,
@@ -12,30 +13,75 @@ import {
   RefreshCw,
   CheckCircle2,
   ArrowLeft,
-  SlidersHorizontal,
+  Store,
+  Sparkles,
+  Smartphone,
+  ChevronDown,
 } from "lucide-react";
 import { Header } from "@/components/dashboard/Header";
+import { WhatsAppTestModal } from "@/components/dashboard/WhatsAppTestModal";
 import { Card, Badge, Button } from "@/lib/ui";
-import { api, ConversationSummary, ChatHistoryRecord } from "@/lib/api";
+import { api, ConversationSummary, ChatHistoryRecord, StoreResponse } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 
 export default function ConversationsPage() {
+  const [stores, setStores] = useState<StoreResponse[]>([]);
+  const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [sessionMessages, setSessionMessages] = useState<ChatHistoryRecord[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isTestWhatsAppOpen, setIsTestWhatsAppOpen] = useState(false);
   // On mobile: toggle between "list" and "chat"
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
 
-  async function fetchConversations() {
+  // Load stores list
+  const loadStoresAndData = useCallback(async () => {
     try {
       setLoadingList(true);
-      const list = await api.getConversations();
+      const storesList = await api.listStores().catch(() => []);
+      setStores(storesList);
+
+      const targetStoreId = activeStoreId || (storesList.length > 0 ? storesList[0].id : null);
+      if (targetStoreId) {
+        setActiveStoreId(targetStoreId);
+        const list = await api.getConversations(targetStoreId).catch(() => []);
+        setConversations(list);
+        if (list.length > 0) {
+          setSelectedSessionId(list[0].session_id);
+        } else {
+          setSelectedSessionId(null);
+          setSessionMessages([]);
+        }
+      } else {
+        setConversations([]);
+        setSelectedSessionId(null);
+        setSessionMessages([]);
+      }
+    } catch (e) {
+      console.error("Failed to load stores/conversations:", e);
+      setConversations([]);
+    } finally {
+      setLoadingList(false);
+    }
+  }, [activeStoreId]);
+
+  async function fetchConversations(storeId?: string) {
+    const targetId = storeId || activeStoreId;
+    if (!targetId) return;
+    try {
+      setLoadingList(true);
+      const list = await api.getConversations(targetId);
       setConversations(list);
-      if (list.length > 0 && !selectedSessionId) {
-        setSelectedSessionId(list[0].session_id);
+      if (list.length > 0) {
+        if (!selectedSessionId || !list.some((c) => c.session_id === selectedSessionId)) {
+          setSelectedSessionId(list[0].session_id);
+        }
+      } else {
+        setSelectedSessionId(null);
+        setSessionMessages([]);
       }
     } catch (e) {
       console.error("Failed to load conversations:", e);
@@ -44,10 +90,11 @@ export default function ConversationsPage() {
     }
   }
 
-  async function fetchHistory(sessionId: string) {
+  async function fetchHistory(sessionId: string, storeId?: string) {
+    const targetId = storeId || activeStoreId;
     try {
       setLoadingMessages(true);
-      const msgs = await api.getChatHistory(sessionId);
+      const msgs = await api.getChatHistory(sessionId, targetId || undefined);
       setSessionMessages(msgs);
     } catch (e) {
       console.error("Failed to load history:", e);
@@ -57,14 +104,25 @@ export default function ConversationsPage() {
   }
 
   useEffect(() => {
-    fetchConversations();
-  }, []);
+    loadStoresAndData();
+  }, [loadStoresAndData]);
 
   useEffect(() => {
     if (selectedSessionId) {
-      fetchHistory(selectedSessionId);
+      fetchHistory(selectedSessionId, activeStoreId || undefined);
+    } else {
+      setSessionMessages([]);
     }
-  }, [selectedSessionId]);
+  }, [selectedSessionId, activeStoreId]);
+
+  const handleStoreChange = (storeId: string) => {
+    setActiveStoreId(storeId);
+    setSelectedSessionId(null);
+    setSessionMessages([]);
+    fetchConversations(storeId);
+  };
+
+  const activeStore = stores.find((s) => s.id === activeStoreId) || stores[0] || null;
 
   const filteredConversations = conversations.filter(
     (c) =>
@@ -81,9 +139,38 @@ export default function ConversationsPage() {
     <div className="flex-1 flex flex-col min-h-screen md:h-screen md:overflow-hidden bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white transition-colors">
       <Header
         title="Live AI Chat Logs & Tool Inspector"
-        description="Inspect multi-turn conversations, tool calling parameter inputs, and database outputs in real-time."
-        onRefresh={fetchConversations}
+        description="Inspect multi-turn customer conversations, tool calling parameters, and database outputs in real-time."
+        onRefresh={() => fetchConversations()}
+        onOpenWhatsAppTest={() => setIsTestWhatsAppOpen(true)}
       />
+
+      {/* Store Context Switcher Bar */}
+      {stores.length > 1 && (
+        <div className="px-4 sm:px-6 pt-3 shrink-0 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 p-1.5 px-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 shadow-xs">
+            <Store className="h-3.5 w-3.5 text-blue-500" />
+            <span>Store Context:</span>
+            <select
+              value={activeStoreId || ""}
+              onChange={(e) => handleStoreChange(e.target.value)}
+              className="bg-transparent text-xs font-bold text-zinc-900 dark:text-white focus:outline-none cursor-pointer"
+            >
+              {stores.map((s) => (
+                <option key={s.id} value={s.id} className="bg-white dark:bg-zinc-900">
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Link href="/dashboard/ai-bot">
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+              <Bot className="h-3.5 w-3.5 text-indigo-500" />
+              <span>Open AI Bot Playground</span>
+            </Button>
+          </Link>
+        </div>
+      )}
 
       <div className="flex-1 flex flex-col md:flex-row md:overflow-hidden p-4 sm:p-6 gap-4 sm:gap-6">
         {/* Left Sessions List Pane */}
@@ -111,8 +198,9 @@ export default function ConversationsPage() {
             {loadingList ? (
               <div className="p-8 text-center text-xs text-zinc-500">Loading conversation logs...</div>
             ) : filteredConversations.length === 0 ? (
-              <div className="p-8 text-center text-xs text-zinc-500">
-                No active conversations found. Try asking a question in the customer chat widget!
+              <div className="p-8 text-center text-xs text-zinc-500 space-y-2">
+                <p className="font-semibold text-zinc-700 dark:text-zinc-300">No chat sessions found</p>
+                <p className="text-[11px] text-zinc-400">Incoming customer conversations will appear here.</p>
               </div>
             ) : (
               filteredConversations.map((conv) => {
@@ -206,8 +294,35 @@ export default function ConversationsPage() {
             {loadingMessages ? (
               <div className="p-12 text-center text-xs text-zinc-500">Loading thread records...</div>
             ) : sessionMessages.length === 0 ? (
-              <div className="p-12 text-center text-xs text-zinc-500">
-                Select a conversation to view the interactive audit trail.
+              <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4 max-w-md mx-auto my-auto">
+                <div className="h-16 w-16 rounded-3xl gradient-blue-indigo flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
+                  <MessageSquare className="h-8 w-8" />
+                </div>
+                <div className="space-y-1.5">
+                  <h4 className="text-base font-bold text-zinc-900 dark:text-white">
+                    No Customer Chats Recorded Yet
+                  </h4>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                    Customer WhatsApp conversations and AI agent responses will appear here with complete real-time tool execution logs.
+                  </p>
+                </div>
+                <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                  <Link href="/dashboard/ai-bot">
+                    <Button variant="gradient" size="sm" className="gap-1.5 text-xs min-h-[38px]">
+                      <Bot className="h-4 w-4" />
+                      <span>Test in AI Bot Playground</span>
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsTestWhatsAppOpen(true)}
+                    className="gap-1.5 text-xs min-h-[38px] text-emerald-700 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20"
+                  >
+                    <Smartphone className="h-4 w-4" />
+                    <span>Test on WhatsApp</span>
+                  </Button>
+                </div>
               </div>
             ) : (
               sessionMessages.map((msg, idx) => {
@@ -288,6 +403,16 @@ export default function ConversationsPage() {
           </div>
         </div>
       </div>
+
+      {/* WhatsApp Test Modal */}
+      {activeStore && (
+        <WhatsAppTestModal
+          isOpen={isTestWhatsAppOpen}
+          storeId={activeStore.id}
+          storeName={activeStore.name}
+          onClose={() => setIsTestWhatsAppOpen(false)}
+        />
+      )}
     </div>
   );
 }

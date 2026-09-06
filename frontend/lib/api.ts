@@ -521,12 +521,13 @@ export const api = {
   // ----------------------------------------
   // Chat APIs
   // ----------------------------------------
-  async sendChatMessage(sessionId: string, message: string, customerEmail?: string): Promise<ChatResponse> {
+  async sendChatMessage(sessionId: string, message: string, customerEmail?: string, storeId?: string): Promise<ChatResponse> {
     try {
       const res = await apiClient.post<ChatResponse>("/api/v1/chat", {
         session_id: sessionId,
         message,
         customer_email: customerEmail || undefined,
+        store_id: storeId || undefined,
       });
       return res.data;
     } catch (err: any) {
@@ -534,8 +535,10 @@ export const api = {
     }
   },
 
-  async getChatHistory(sessionId: string): Promise<ChatHistoryRecord[]> {
-    const res = await apiClient.get<ChatHistoryRecord[]>(`/api/v1/chat/history/${encodeURIComponent(sessionId)}`);
+  async getChatHistory(sessionId: string, storeId?: string): Promise<ChatHistoryRecord[]> {
+    const res = await apiClient.get<ChatHistoryRecord[]>(`/api/v1/chat/history/${encodeURIComponent(sessionId)}`, {
+      params: storeId ? { store_id: storeId } : undefined,
+    });
     return res.data;
   },
 
