@@ -4,6 +4,7 @@ product catalog list, orders, and automated WhatsApp cart recovery triggers.
 All handlers wrap logic in try/except blocks to ensure CORS headers and clean JSON responses.
 """
 
+import uuid
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, status, Query
 from fastapi.responses import JSONResponse
@@ -29,26 +30,51 @@ router = APIRouter()
     summary="Merchant Dashboard KPI Metrics",
     description="Returns high-level statistics for conversations, orders, low-stock alerts, and cart recovery."
 )
-def get_dashboard_stats(db: Session = Depends(get_db)):
+def get_dashboard_stats(
+    store_id: Optional[str] = Query(None, description="Optional tenant store UUID filter"),
+    db: Session = Depends(get_db),
+):
     try:
-        total_sessions = db.query(func.count(distinct(ChatHistory.session_id))).scalar() or 0
-        total_messages = db.query(func.count(ChatHistory.id)).scalar() or 0
-        total_orders = db.query(func.count(Order.id)).scalar() or 0
-        shipped_orders = db.query(func.count(Order.id)).filter(Order.status == "Shipped").scalar() or 0
+        parsed_store_uuid = None
+        if store_id:
+            try:
+                parsed_store_uuid = uuid.UUID(store_id.strip())
+            except (ValueError, AttributeError):
+                parsed_store_uuid = None
+
+        # Build queries scoped to store_id if provided
+        sess_query = db.query(func.count(distinct(ChatHistory.session_id)))
+        msg_query = db.query(func.count(ChatHistory.id))
+        order_query = db.query(func.count(Order.id))
+        shipped_query = db.query(func.count(Order.id)).filter(Order.status == "Shipped")
+        prod_query = db.query(Product)
+        cart_query = db.query(func.count(CartSession.id))
+        eligible_query = db.query(func.count(CartSession.id)).filter(CartSession.discount_eligible == True)
+
+        if parsed_store_uuid is not None:
+            sess_query = sess_query.filter(ChatHistory.store_id == parsed_store_uuid)
+            msg_query = msg_query.filter(ChatHistory.store_id == parsed_store_uuid)
+            order_query = order_query.filter(Order.store_id == parsed_store_uuid)
+            shipped_query = shipped_query.filter(Order.store_id == parsed_store_uuid)
+            prod_query = prod_query.filter(Product.store_id == parsed_store_uuid)
+
+        total_sessions = sess_query.scalar() or 0
+        total_messages = msg_query.scalar() or 0
+        total_orders = order_query.scalar() or 0
+        shipped_orders = shipped_query.scalar() or 0
 
         # Calculate low stock (products where stock <= 5 or any variant has stock == 0)
-        products = db.query(Product).all()
+        products = prod_query.all()
         low_stock_count = 0
         for p in products:
-            if p.stock_quantity <= 5:
+            if (p.stock_quantity or 0) <= 5:
                 low_stock_count += 1
-            elif any(v.get("stock", 0) == 0 for v in (p.size_variants or [])):
+            elif any(int(v.get("stock", 0) or v.get("stock_count", 0)) == 0 for v in (p.size_variants or [])):
                 low_stock_count += 1
 
         # Cart recovery stats
-        total_carts = db.query(func.count(CartSession.id)).scalar() or 0
-        eligible_carts = db.query(func.count(CartSession.id)).filter(CartSession.discount_eligible == True).scalar() or 0
-        recovered_carts = db.query(func.count(CartSession.id)).filter(CartSession.is_recovered == True).scalar() or 0
+        total_carts = cart_query.scalar() or 0
+        eligible_carts = eligible_query.scalar() or 0
         recovery_rate = round((eligible_carts / max(total_carts, 1)) * 100, 1)
 
         return {
@@ -79,15 +105,30 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     summary="List all chat sessions with summary",
     description="Returns a list of unique session IDs with latest timestamp, message count, and preview."
 )
-def list_conversations(db: Session = Depends(get_db)):
+def list_conversations(
+    store_id: Optional[str] = Query(None, description="Optional tenant store UUID filter"),
+    db: Session = Depends(get_db),
+):
     try:
-        sessions = db.query(distinct(ChatHistory.session_id)).all()
+        parsed_store_uuid = None
+        if store_id:
+            try:
+                parsed_store_uuid = uuid.UUID(store_id.strip())
+            except (ValueError, AttributeError):
+                parsed_store_uuid = None
+
+        sess_query = db.query(distinct(ChatHistory.session_id))
+        if parsed_store_uuid is not None:
+            sess_query = sess_query.filter(ChatHistory.store_id == parsed_store_uuid)
+
+        sessions = sess_query.all()
         results = []
 
         for (s_id,) in sessions:
-            msgs = db.query(ChatHistory).filter(
-                ChatHistory.session_id == s_id
-            ).order_by(ChatHistory.created_at.asc()).all()
+            msg_q = db.query(ChatHistory).filter(ChatHistory.session_id == s_id)
+            if parsed_store_uuid is not None:
+                msg_q = msg_q.filter(ChatHistory.store_id == parsed_store_uuid)
+            msgs = msg_q.order_by(ChatHistory.created_at.asc()).all()
 
             if not msgs:
                 continue
@@ -95,7 +136,6 @@ def list_conversations(db: Session = Depends(get_db)):
             first_user_msg = next((m.content for m in msgs if m.role == "user"), "New conversation")
             last_msg = msgs[-1]
 
-            # Check if tools were used in this conversation
             tools_used = [m.name for m in msgs if m.role == "tool" and m.name]
             channel = "WhatsApp" if s_id.startswith("wa_") else "Web Widget"
 
@@ -109,7 +149,6 @@ def list_conversations(db: Session = Depends(get_db)):
                 "status": "Resolved" if len(msgs) > 1 else "Active",
             })
 
-        # Sort most recent first
         results.sort(key=lambda x: x.get("last_active") or "", reverse=True)
         return results
     except Exception as e:
@@ -122,9 +161,19 @@ def list_conversations(db: Session = Depends(get_db)):
     summary="List all catalog products",
     description="Returns products with current stock counts and variant details."
 )
-def list_products(db: Session = Depends(get_db)):
+def list_products(
+    store_id: Optional[str] = Query(None, description="Optional tenant store UUID filter"),
+    db: Session = Depends(get_db),
+):
     try:
-        products = db.query(Product).order_by(Product.id.asc()).all()
+        query = db.query(Product)
+        if store_id:
+            try:
+                parsed_store_uuid = uuid.UUID(store_id.strip())
+                query = query.filter(Product.store_id == parsed_store_uuid)
+            except (ValueError, AttributeError):
+                pass
+        products = query.order_by(Product.id.asc()).all()
         return [p.to_dict() for p in products]
     except Exception as e:
         print(f"[ERROR] /admin/products failed: {e}")
@@ -140,9 +189,19 @@ def list_products(db: Session = Depends(get_db)):
     summary="List all store orders",
     description="Returns customer orders with live fulfillment status and tracking."
 )
-def list_orders(db: Session = Depends(get_db)):
+def list_orders(
+    store_id: Optional[str] = Query(None, description="Optional tenant store UUID filter"),
+    db: Session = Depends(get_db),
+):
     try:
-        orders = db.query(Order).order_by(Order.created_at.desc()).all()
+        query = db.query(Order)
+        if store_id:
+            try:
+                parsed_store_uuid = uuid.UUID(store_id.strip())
+                query = query.filter(Order.store_id == parsed_store_uuid)
+            except (ValueError, AttributeError):
+                pass
+        orders = query.order_by(Order.created_at.desc()).all()
         return [o.to_dict() for o in orders]
     except Exception as e:
         print(f"[ERROR] /admin/orders failed: {e}")

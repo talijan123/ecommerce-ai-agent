@@ -140,44 +140,6 @@ def ensure_db_initialized():
 
     try:
         create_db_and_tables()
-
-        from app.models.store import Store
-        from app.models.product import Product
-        from app.models.order import Order
-
-        with SessionLocal() as db:
-            # Ensure default demo store exists
-            default_phone_id = settings.WHATSAPP_PHONE_NUMBER_ID or "1330161100179237"
-            store = db.query(Store).filter(Store.whatsapp_phone_number_id == default_phone_id).first()
-            if not store:
-                store = Store(
-                    name="AutoCommerce Demo Store",
-                    owner_email="merchant@autocommerce.example.com",
-                    whatsapp_phone_number_id=default_phone_id,
-                    whatsapp_access_token=settings.WHATSAPP_TOKEN,
-                    system_prompt="You are a helpful customer support assistant for AutoCommerce.",
-                    is_active=True,
-                )
-                db.add(store)
-                db.commit()
-                db.refresh(store)
-
-            product_count = db.query(Product).count()
-            if product_count == 0:
-                print("[INFO] Database empty. Seeding products from DummyJSON...")
-                try:
-                    from scripts.seed_real_products import seed_real_products
-                    seed_real_products()
-                except Exception:
-                    from seed_db import seed_database
-                    seed_database()
-
-            # Associate any unassigned products/orders to default store
-            if store:
-                db.query(Product).filter(Product.store_id.is_(None)).update({"store_id": store.id}, synchronize_session=False)
-                db.query(Order).filter(Order.store_id.is_(None)).update({"store_id": store.id}, synchronize_session=False)
-                db.commit()
-
         _db_initialized = True
     except Exception as e:
         print(f"[WARN] Database initialization warning: {e}")

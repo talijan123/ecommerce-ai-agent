@@ -183,7 +183,7 @@ export default function SignupPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Alex Morgan"
+                  placeholder="e.g. John Doe"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   disabled={isSubmitting || !!successInfo}
@@ -204,7 +204,7 @@ export default function SignupPage() {
                 <input
                   type="email"
                   required
-                  placeholder="merchant@store.com"
+                  placeholder="merchant@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isSubmitting || !!successInfo}

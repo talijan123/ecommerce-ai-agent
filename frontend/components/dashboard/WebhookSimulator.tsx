@@ -35,29 +35,29 @@ const DEMO_CARTS: Record<
     url: string;
   }
 > = {
-  sess_live_wa_verify_001: {
-    name: "Talal Test",
-    phone: "923187806306",
+  sess_demo_recovery_001: {
+    name: "Jane Doe",
+    phone: "+1 (555) 019-2834",
     code: "RECOVER15",
     pct: 15,
     items: "Minimalist Ceramic Lamp (Size Standard)",
-    url: "https://ecommerce-store-frontend-swart.vercel.app?cart_session=sess_live_wa_verify_001&discount=RECOVER15",
+    url: "https://your-store.com?cart_session=sess_demo_recovery_001&discount=RECOVER15",
   },
   sess_abc123: {
-    name: "Sarah Smith",
-    phone: "923187806306",
+    name: "Alex Morgan",
+    phone: "+1 (555) 012-3456",
     code: "SAVE15",
     pct: 15,
-    items: "Essence Mascara Lash Princess (Size 30ml)",
-    url: "https://ecommerce-store-frontend-swart.vercel.app?cart_session=sess_abc123&discount=SAVE15",
+    items: "Classic Cotton T-Shirt (Size M)",
+    url: "https://your-store.com?cart_session=sess_abc123&discount=SAVE15",
   },
   sess_xyz789: {
-    name: "Ali Khan",
-    phone: "923187806306",
+    name: "Jordan Lee",
+    phone: "+1 (555) 018-7654",
     code: "RECOVER10",
     pct: 10,
-    items: "Powder Canister (Size Standard)",
-    url: "https://ecommerce-store-frontend-swart.vercel.app?cart_session=sess_xyz789&discount=RECOVER10",
+    items: "Wireless Noise-Cancelling Headphones",
+    url: "https://your-store.com?cart_session=sess_xyz789&discount=RECOVER10",
   },
 };
 
@@ -68,8 +68,8 @@ export function WebhookSimulator({ isOpen, onClose, onSuccess }: WebhookSimulato
 
   // Order webhook mock form
   const [orderNumber, setOrderNumber] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("john.customer@example.com");
-  const [customerName, setCustomerName] = useState("John Customer");
+  const [customerEmail, setCustomerEmail] = useState("customer@example.com");
+  const [customerName, setCustomerName] = useState("Jane Doe");
   const [carrier, setCarrier] = useState("DHL Express");
 
   // Inventory webhook mock form
@@ -86,8 +86,8 @@ export function WebhookSimulator({ isOpen, onClose, onSuccess }: WebhookSimulato
     setResult(null);
     setLoading(false);
     setOrderNumber(`ORD-${Math.floor(1000 + Math.random() * 9000)}`);
-    setCustomerEmail("john.customer@example.com");
-    setCustomerName("John Customer");
+    setCustomerEmail("customer@example.com");
+    setCustomerName("Jane Doe");
     setCarrier("DHL Express");
     setSku("BEA-ESS-ESS-001");
     setSize("30ml");
@@ -354,14 +354,14 @@ export function WebhookSimulator({ isOpen, onClose, onSuccess }: WebhookSimulato
                   className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-zinc-900 dark:text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
                 >
                   <option value="all">⚡ All Unrecovered Abandoned Carts (Batch Dispatch)</option>
-                  <option value="sess_live_wa_verify_001">
-                    Talal Test (sess_live_wa_verify_001) - 923187806306 [RECOVER15 / 15% off]
+                  <option value="sess_demo_recovery_001">
+                    Jane Doe (sess_demo_recovery_001) - +1 (555) 019-2834 [RECOVER15 / 15% off]
                   </option>
                   <option value="sess_abc123">
-                    Sarah Smith (sess_abc123) - 923187806306 [SAVE15 / 15% off]
+                    Alex Morgan (sess_abc123) - +1 (555) 012-3456 [SAVE15 / 15% off]
                   </option>
                   <option value="sess_xyz789">
-                    Ali Khan (sess_xyz789) - 923187806306 [RECOVER10 / 10% off]
+                    Jordan Lee (sess_xyz789) - +1 (555) 018-7654 [RECOVER10 / 10% off]
                   </option>
                 </select>
               </div>

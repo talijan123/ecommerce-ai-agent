@@ -542,23 +542,31 @@ export const api = {
   // ----------------------------------------
   // Admin & Stats APIs
   // ----------------------------------------
-  async getDashboardStats(): Promise<DashboardStats> {
-    const res = await apiClient.get<DashboardStats>("/api/v1/admin/stats");
+  async getDashboardStats(storeId?: string): Promise<DashboardStats> {
+    const res = await apiClient.get<DashboardStats>("/api/v1/admin/stats", {
+      params: storeId ? { store_id: storeId } : undefined,
+    });
     return res.data;
   },
 
-  async getConversations(): Promise<ConversationSummary[]> {
-    const res = await apiClient.get<ConversationSummary[]>("/api/v1/admin/conversations");
+  async getConversations(storeId?: string): Promise<ConversationSummary[]> {
+    const res = await apiClient.get<ConversationSummary[]>("/api/v1/admin/conversations", {
+      params: storeId ? { store_id: storeId } : undefined,
+    });
     return res.data;
   },
 
-  async getProducts(): Promise<Product[]> {
-    const res = await apiClient.get<Product[]>("/api/v1/admin/products");
+  async getProducts(storeId?: string): Promise<Product[]> {
+    const res = await apiClient.get<Product[]>("/api/v1/admin/products", {
+      params: storeId ? { store_id: storeId } : undefined,
+    });
     return res.data;
   },
 
-  async getOrders(): Promise<Order[]> {
-    const res = await apiClient.get<Order[]>("/api/v1/admin/orders");
+  async getOrders(storeId?: string): Promise<Order[]> {
+    const res = await apiClient.get<Order[]>("/api/v1/admin/orders", {
+      params: storeId ? { store_id: storeId } : undefined,
+    });
     return res.data;
   },
 

@@ -55,7 +55,7 @@ export default function CatalogAndOrdersPage() {
     category: "Apparel",
     price: "",
     stock_quantity: "",
-    sizes: "S: 10, M: 8, L: 0, XL: 5",
+    sizes: "",
     description: "",
   });
   const [uploadFileName, setUploadFileName] = useState<string | null>(null);
@@ -64,20 +64,21 @@ export default function CatalogAndOrdersPage() {
   async function loadData() {
     try {
       setLoading(true);
-      const [storesData, ords] = await Promise.all([
-        api.listStores().catch(() => []),
-        api.getOrders().catch(() => []),
-      ]);
+      const storesData = await api.listStores().catch(() => []);
       setStores(storesData);
-      setOrders(ords);
 
       if (storesData.length > 0) {
         const store = activeStore || storesData[0];
         setActiveStore(store);
-        const storeProds = await api.getStoreProducts(store.id).catch(() => []);
+        const [storeProds, ords] = await Promise.all([
+          api.getStoreProducts(store.id).catch(() => []),
+          api.getOrders(store.id).catch(() => []),
+        ]);
         setProducts(storeProds);
+        setOrders(ords);
       } else {
         setProducts([]);
+        setOrders([]);
       }
     } catch (e) {
       console.error("Error loading catalog/orders:", e);
@@ -578,7 +579,7 @@ export default function CatalogAndOrdersPage() {
                     required
                     value={newProduct.price}
                     onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-                    placeholder="89.99"
+                    placeholder="0.00"
                     className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                 </div>
@@ -589,7 +590,7 @@ export default function CatalogAndOrdersPage() {
                     type="number"
                     value={newProduct.stock_quantity}
                     onChange={(e) => setNewProduct({ ...newProduct, stock_quantity: e.target.value })}
-                    placeholder="23"
+                    placeholder="0"
                     className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                 </div>
@@ -603,7 +604,7 @@ export default function CatalogAndOrdersPage() {
                   type="text"
                   value={newProduct.sizes}
                   onChange={(e) => setNewProduct({ ...newProduct, sizes: e.target.value })}
-                  placeholder="S: 10, M: 8, L: 0, XL: 5"
+                  placeholder="e.g. S: 10, M: 20, L: 15"
                   className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 />
               </div>
@@ -612,7 +613,7 @@ export default function CatalogAndOrdersPage() {
               <div className="space-y-1.5">
                 <label className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">Product Photography</label>
                 <div
-                  onClick={() => setUploadFileName("jacket_preview_hd.jpg")}
+                  onClick={() => setUploadFileName("product_preview.jpg")}
                   className="p-4 rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-900/80 cursor-pointer flex flex-col items-center justify-center gap-1.5 transition-colors text-center"
                 >
                   <UploadCloud className="h-6 w-6 text-zinc-400" />

@@ -385,8 +385,12 @@ async def receive_whatsapp_webhook(
                         Store.whatsapp_phone_number_id == phone_number_id,
                         Store.is_active == True,
                     ).first()
-
-                if not matched_store:
+                    if not matched_store:
+                        logger.warning(
+                            f"⚠️ WhatsApp Webhook received for unknown or inactive phone_number_id='{phone_number_id}'. Skipping dispatch."
+                        )
+                        continue
+                else:
                     matched_store = db.query(Store).filter(Store.is_active == True).first()
 
                 # Extract messages

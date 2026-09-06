@@ -370,7 +370,7 @@ export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidg
                 type="email"
                 value={customerEmail}
                 onChange={(e) => setCustomerEmail(e.target.value)}
-                placeholder="Email for order tracking or cart recovery (e.g. sarah.smith@example.com)"
+                placeholder="Email for order tracking or cart recovery (e.g. customer@example.com)"
                 className="flex-1 bg-transparent border-none text-zinc-200 placeholder:text-zinc-500 text-[11px] focus:outline-none"
               />
               {customerEmail && (

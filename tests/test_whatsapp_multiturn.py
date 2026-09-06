@@ -27,11 +27,11 @@ class TestWhatsAppMultiTurnMemory(unittest.TestCase):
         self.test_phone = "923991234567"
         self.session_id = f"wa_{self.test_phone}"
         # Clean test records
-        self.db.query(ChatHistory).filter(ChatHistory.session_id == self.session_id).delete()
+        self.db.query(ChatHistory).filter(ChatHistory.session_id.contains(self.test_phone)).delete(synchronize_session=False)
         self.db.commit()
 
     def tearDown(self):
-        self.db.query(ChatHistory).filter(ChatHistory.session_id == self.session_id).delete()
+        self.db.query(ChatHistory).filter(ChatHistory.session_id.contains(self.test_phone)).delete(synchronize_session=False)
         self.db.commit()
         self.db.close()
 
@@ -183,7 +183,7 @@ class TestWhatsAppMultiTurnMemory(unittest.TestCase):
             )
 
         # Verify ChatHistory in database
-        records = self.db.query(ChatHistory).filter(ChatHistory.session_id == self.session_id).order_by(ChatHistory.created_at.asc()).all()
+        records = self.db.query(ChatHistory).filter(ChatHistory.session_id.contains(self.test_phone)).order_by(ChatHistory.created_at.asc()).all()
 
         self.assertEqual(len(records), 2)
         self.assertEqual(records[0].role, "user")

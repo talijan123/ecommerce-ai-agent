@@ -103,21 +103,23 @@ export default function DashboardOverviewPage() {
   const loadDashboard = useCallback(async () => {
     try {
       setLoading(true);
-      const [storesData, statsData, ordersData] = await Promise.all([
-        api.listStores().catch(() => []),
-        api.getDashboardStats().catch(() => null),
-        api.getOrders().catch(() => []),
-      ]);
-
+      const storesData = await api.listStores().catch(() => []);
       setStores(storesData);
-      setStats(statsData);
-      setOrders(ordersData);
 
       if (storesData.length > 0) {
         const selectedId = activeStoreId || storesData[0].id;
         setActiveStoreId(selectedId);
+        const [statsData, ordersData] = await Promise.all([
+          api.getDashboardStats(selectedId).catch(() => null),
+          api.getOrders(selectedId).catch(() => []),
+        ]);
+        setStats(statsData);
+        setOrders(ordersData);
         loadStoreCatalog(selectedId);
       } else {
+        setStats(null);
+        setOrders([]);
+        setProducts([]);
         // No stores found -> automatically open onboarding wizard
         setIsOnboardingOpen(true);
       }
@@ -134,9 +136,19 @@ export default function DashboardOverviewPage() {
 
   const activeStore = stores.find((s) => s.id === activeStoreId) || stores[0] || null;
 
-  const handleStoreChange = (storeId: string) => {
+  const handleStoreChange = async (storeId: string) => {
     setActiveStoreId(storeId);
     loadStoreCatalog(storeId);
+    try {
+      const [statsData, ordersData] = await Promise.all([
+        api.getDashboardStats(storeId).catch(() => null),
+        api.getOrders(storeId).catch(() => []),
+      ]);
+      setStats(statsData);
+      setOrders(ordersData);
+    } catch (err) {
+      console.error("Error loading store metrics:", err);
+    }
   };
 
   // Derive unique categories from tenant's real catalog
@@ -280,7 +292,7 @@ export default function DashboardOverviewPage() {
             title="Customer Inquiries"
             value={stats?.total_messages?.toString() || "0"}
             icon={Bot}
-            trend={{ value: "Autonomous AI AI replies", isPositive: true }}
+            trend={{ value: "Autonomous AI replies", isPositive: true }}
             accentColor="indigo"
           />
           <MetricsCard

@@ -192,12 +192,12 @@ export function ShopifyConnectModal({
                 required
                 value={shopDomain}
                 onChange={(e) => setShopDomain(e.target.value)}
-                placeholder="e.g. yqcncc-b0.myshopify.com"
+                placeholder="your-store-name.myshopify.com"
                 className="w-full bg-white dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono transition-colors"
               />
             </div>
             <span className="text-[11px] text-zinc-400 block">
-              Enter your store's primary myshopify domain (e.g. <code className="text-emerald-600 dark:text-emerald-400">yqcncc-b0.myshopify.com</code>).
+              Enter your store's primary myshopify domain (e.g. <code className="text-emerald-600 dark:text-emerald-400">your-store-name.myshopify.com</code>).
             </span>
           </div>
 
@@ -250,7 +250,7 @@ export function ShopifyConnectModal({
                   required={authMode === "oauth"}
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
-                  placeholder="e.g. 5a1b2c3d4e5f6g7h8i9j0..."
+                  placeholder="Enter your Shopify Client ID"
                   className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white font-mono placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                 />
               </div>
@@ -265,7 +265,7 @@ export function ShopifyConnectModal({
                     required={authMode === "oauth"}
                     value={clientSecret}
                     onChange={(e) => setClientSecret(e.target.value)}
-                    placeholder="shpss_xxxxxxxxxxxxxxxxxxxxxxxx"
+                    placeholder="Enter Client Secret (shpss_...)"
                     className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-zinc-900 dark:text-white font-mono placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                   />
                   <button
@@ -290,7 +290,7 @@ export function ShopifyConnectModal({
                 required={authMode === "legacy_token"}
                 value={accessToken}
                 onChange={(e) => setAccessToken(e.target.value)}
-                placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx"
+                placeholder="Enter Admin API Token (shpat_...)"
                 className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white font-mono placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
               />
               <span className="text-[11px] text-zinc-400 block">

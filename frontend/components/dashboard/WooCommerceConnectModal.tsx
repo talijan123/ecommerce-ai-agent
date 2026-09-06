@@ -131,7 +131,7 @@ export function WooCommerceConnectModal({
               required
               value={shopDomain}
               onChange={(e) => setShopDomain(e.target.value)}
-              placeholder="e.g. https://your-store.com"
+              placeholder="https://your-store.com"
               className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             />
           </div>
@@ -145,7 +145,7 @@ export function WooCommerceConnectModal({
                 type="password"
                 value={consumerKey}
                 onChange={(e) => setConsumerKey(e.target.value)}
-                placeholder="ck_..."
+                placeholder="Enter Consumer Key (ck_...)"
                 className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>
@@ -157,7 +157,7 @@ export function WooCommerceConnectModal({
                 type="password"
                 value={consumerSecret}
                 onChange={(e) => setConsumerSecret(e.target.value)}
-                placeholder="cs_..."
+                placeholder="Enter Consumer Secret (cs_...)"
                 className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>
