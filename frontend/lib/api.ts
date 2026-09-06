@@ -171,6 +171,8 @@ export interface Order {
 export interface ShopifyConnectRequest {
   store_id: string;
   shop_domain: string;
+  client_id?: string;
+  client_secret?: string;
   access_token?: string;
   api_key?: string;
 }

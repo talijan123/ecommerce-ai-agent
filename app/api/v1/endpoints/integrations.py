@@ -121,7 +121,7 @@ SAMPLE_SHOPIFY_CATALOG = [
 @router.post(
     "/shopify/connect",
     response_model=IntegrationResponse,
-    summary="Connect a Shopify store domain and API access token",
+    summary="Connect a Shopify store domain using Client Credentials or Access Token",
 )
 def connect_shopify(
     payload: ShopifyConnectRequest,
@@ -131,6 +131,8 @@ def connect_shopify(
     """
     Connect a merchant's Shopify store:
     - Normalizes shop domain (e.g. brand.myshopify.com)
+    - If Client ID & Client Secret are provided without access token:
+      exchanges them via OAuth / Client Credentials endpoint
     - Verifies credentials against Shopify Admin REST API
     - Saves or updates StoreIntegration record
     - Triggers immediate product catalog ingestion
@@ -143,13 +145,40 @@ def connect_shopify(
             detail="Invalid Shopify domain. Please provide a valid store domain (e.g. brand.myshopify.com).",
         )
 
-    # Validate token/credentials
-    if payload.access_token:
-        is_valid = ShopifySyncService.verify_credentials(clean_domain, payload.access_token)
+    resolved_client_id = payload.client_id or payload.api_key
+    resolved_client_secret = payload.client_secret
+    access_token = payload.access_token
+
+    # 1. If Client ID & Client Secret are provided, exchange them for an Admin API access token
+    if resolved_client_id and resolved_client_secret and not access_token:
+        exchanged_token, raw_resp, err_msg = ShopifySyncService.exchange_client_credentials(
+            clean_domain, resolved_client_id, resolved_client_secret
+        )
+        if not exchanged_token:
+            detail_msg = f"Failed to exchange Shopify credentials for store '{clean_domain}': {err_msg}"
+            if "application_cannot_be_found" in (err_msg or ""):
+                detail_msg = (
+                    f"Shopify App with Client ID '{resolved_client_id}' not found or not installed on '{clean_domain}'. "
+                    "Please verify your Shopify Partner/Dev Dashboard app settings and ensure it is installed on the store."
+                )
+            elif "invalid_client" in (err_msg or ""):
+                detail_msg = (
+                    f"Invalid Client Secret for Shopify App '{resolved_client_id}'. "
+                    "Please double-check the secret in your Shopify Partner/Dev Dashboard."
+                )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=detail_msg,
+            )
+        access_token = exchanged_token
+
+    # 2. Validate token/credentials
+    if access_token:
+        is_valid = ShopifySyncService.verify_credentials(clean_domain, access_token)
         if not is_valid:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to authenticate with Shopify store '{clean_domain}'. Please check your Admin API access token.",
+                detail=f"Failed to authenticate with Shopify store '{clean_domain}'. Please check your credentials or Admin API access token.",
             )
 
     integration = (
@@ -166,31 +195,31 @@ def connect_shopify(
             store_id=store.id,
             platform="shopify",
             shop_domain=clean_domain,
-            access_token=payload.access_token,
-            api_key=payload.api_key,
+            access_token=access_token,
+            api_key=resolved_client_id,
             sync_status="connected",
             products_synced_count=0,
         )
         db.add(integration)
     else:
         integration.shop_domain = clean_domain
-        if payload.access_token:
-            integration.access_token = payload.access_token
-        if payload.api_key:
-            integration.api_key = payload.api_key
+        if access_token:
+            integration.access_token = access_token
+        if resolved_client_id:
+            integration.api_key = resolved_client_id
         integration.sync_status = "connected"
         integration.updated_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(integration)
 
-    # Immediately ingest products
+    # 3. Immediately ingest products
     try:
         ShopifySyncService.fetch_and_ingest_products(
             db=db,
             store_id=str(store.id),
             shop_domain=clean_domain,
-            access_token=payload.access_token,
+            access_token=access_token,
         )
         db.refresh(integration)
     except Exception as e:

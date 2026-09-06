@@ -113,53 +113,7 @@ def exchange_client_credentials(
     Exchange Client ID and Client Secret for Shopify Store Access Token.
     Returns: (access_token, full_response_json, error_message)
     """
-    clean_domain = ShopifySyncService.clean_shop_domain(shop_domain)
-    if not clean_domain:
-        return None, None, f"Invalid Shopify domain: '{shop_domain}'"
-
-    token_url = f"https://{clean_domain}/admin/oauth/access_token"
-
-    # Attempt 1: Standard Client Credentials Grant with JSON payload
-    payloads_to_try = [
-        # Grant type client_credentials (Shopify Dev Dashboard custom apps)
-        ({"client_id": client_id, "client_secret": client_secret, "grant_type": "client_credentials"}, "json"),
-        # Direct client_id + client_secret JSON payload
-        ({"client_id": client_id, "client_secret": client_secret}, "json"),
-        # Form-urlencoded client_credentials
-        ({"client_id": client_id, "client_secret": client_secret, "grant_type": "client_credentials"}, "form"),
-    ]
-
-    last_error = ""
-
-    with httpx.Client(timeout=20.0, follow_redirects=True) as client:
-        for idx, (body, enc_type) in enumerate(payloads_to_try, 1):
-            try:
-                if enc_type == "json":
-                    headers = {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                    }
-                    response = client.post(token_url, json=body, headers=headers)
-                else:
-                    headers = {
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        "Accept": "application/json",
-                    }
-                    response = client.post(token_url, data=body, headers=headers)
-
-                if response.status_code == 200:
-                    data = response.json()
-                    access_token = data.get("access_token")
-                    if access_token:
-                        return access_token, data, None
-                    else:
-                        last_error = f"HTTP 200 received but 'access_token' missing in response: {response.text}"
-                else:
-                    last_error = f"HTTP {response.status_code} ({response.reason_phrase}): {response.text}"
-            except Exception as e:
-                last_error = f"Connection error: {str(e)}"
-
-    return None, None, last_error
+    return ShopifySyncService.exchange_client_credentials(shop_domain, client_id, client_secret)
 
 
 def resolve_target_store(db: Any, store_id_arg: Optional[str], shop_domain: str) -> Store:

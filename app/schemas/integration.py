@@ -10,7 +10,9 @@ from pydantic import BaseModel, Field
 class ShopifyConnectRequest(BaseModel):
     store_id: str = Field(..., description="Target Store UUID")
     shop_domain: str = Field(..., description="Shopify store domain, e.g. brand.myshopify.com")
-    access_token: Optional[str] = Field(None, description="Shopify Admin API Access Token (shpat_...)")
+    client_id: Optional[str] = Field(None, description="Shopify App Client ID / API Key for OAuth Client Credentials")
+    client_secret: Optional[str] = Field(None, description="Shopify App Client Secret for OAuth Client Credentials")
+    access_token: Optional[str] = Field(None, description="Shopify Admin API Access Token (shpat_...) [Legacy]")
     api_key: Optional[str] = Field(None, description="Shopify API Key / App Client ID")
 
 

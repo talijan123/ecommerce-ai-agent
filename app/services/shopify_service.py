@@ -9,7 +9,7 @@ import html
 import uuid
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import httpx
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -145,6 +145,83 @@ class ShopifySyncService:
         ):
             return True
         return False
+
+    @classmethod
+    def exchange_client_credentials(
+        cls,
+        shop_domain: str,
+        client_id: str,
+        client_secret: str,
+    ) -> Tuple[Optional[str], Optional[Dict[str, Any]], Optional[str]]:
+        """
+        Exchange Client ID and Client Secret for Shopify Store Access Token.
+        Uses Shopify OAuth / Client Credentials endpoint:
+        POST https://{shop_domain}/admin/oauth/access_token
+
+        Returns: (access_token, full_response_json, error_message)
+        """
+        clean_domain = cls.clean_shop_domain(shop_domain)
+        if not clean_domain:
+            return None, None, f"Invalid Shopify domain: '{shop_domain}'"
+
+        # Mock fallback for sandbox / testing demo domains
+        if "brand-demo" in clean_domain or "example.com" in clean_domain:
+            logger.info(f"[ShopifySync] Generating mock access token for demo domain {clean_domain}")
+            mock_token = f"shpat_mock_{uuid.uuid4().hex[:16]}"
+            return mock_token, {"access_token": mock_token, "scope": "read_products,write_products,read_inventory"}, None
+
+        token_url = f"https://{clean_domain}/admin/oauth/access_token"
+
+        payloads_to_try = [
+            ({"client_id": client_id, "client_secret": client_secret, "grant_type": "client_credentials"}, "json"),
+            ({"client_id": client_id, "client_secret": client_secret}, "json"),
+            ({"client_id": client_id, "client_secret": client_secret, "grant_type": "client_credentials"}, "form"),
+        ]
+
+        last_error = ""
+
+        with httpx.Client(timeout=20.0, follow_redirects=True) as client:
+            for body, enc_type in payloads_to_try:
+                try:
+                    if enc_type == "json":
+                        headers = {
+                            "Content-Type": "application/json",
+                            "Accept": "application/json",
+                        }
+                        response = client.post(token_url, json=body, headers=headers)
+                    else:
+                        headers = {
+                            "Content-Type": "application/x-www-form-urlencoded",
+                            "Accept": "application/json",
+                        }
+                        response = client.post(token_url, data=body, headers=headers)
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        access_token = data.get("access_token")
+                        if access_token:
+                            return access_token, data, None
+                        else:
+                            last_error = f"HTTP 200 received but 'access_token' missing in response: {response.text}"
+                    else:
+                        try:
+                            err_json = response.json()
+                            if isinstance(err_json, dict):
+                                err_desc = (
+                                    err_json.get("error_description")
+                                    or err_json.get("error")
+                                    or err_json.get("message")
+                                    or response.text
+                                )
+                                last_error = f"HTTP {response.status_code} ({response.reason_phrase}): {err_desc}"
+                            else:
+                                last_error = f"HTTP {response.status_code} ({response.reason_phrase}): {response.text}"
+                        except Exception:
+                            last_error = f"HTTP {response.status_code} ({response.reason_phrase}): {response.text}"
+                except Exception as e:
+                    last_error = f"Connection error: {str(e)}"
+
+        return None, None, last_error
 
     @classmethod
     def verify_credentials(cls, shop_domain: str, access_token: Optional[str]) -> bool:

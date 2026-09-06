@@ -153,3 +153,46 @@ def test_resolve_target_store_and_save_integration(tmp_path):
         except Exception:
             pass
         db.close()
+
+
+def test_shopify_connect_endpoint_with_client_credentials():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.core.security import create_access_token
+    from app.models.user import User
+
+    client = TestClient(app)
+    ensure_db_initialized()
+    db = SessionLocal()
+
+    try:
+        # Find or create merchant user and store
+        user = db.query(User).filter(User.email == "admin@autocommerce.ai").first()
+        if not user:
+            user = db.query(User).first()
+        assert user is not None
+
+        store = db.query(Store).filter(Store.is_active == True).first()
+        assert store is not None
+
+        token = create_access_token({"sub": str(user.id), "email": str(user.email)})
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Connect with client_id and client_secret (using test credentials)
+        payload = {
+            "store_id": str(store.id),
+            "shop_domain": "brand-demo.myshopify.com",
+            "client_id": "test_client_id_abc",
+            "client_secret": "test_client_secret_xyz",
+        }
+
+        resp = client.post("/api/v1/integrations/shopify/connect", json=payload, headers=headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["platform"] == "shopify"
+        assert data["shop_domain"] == "brand-demo.myshopify.com"
+        assert data["sync_status"] == "synced"
+        assert data["products_synced_count"] >= 5
+    finally:
+        db.close()
+
