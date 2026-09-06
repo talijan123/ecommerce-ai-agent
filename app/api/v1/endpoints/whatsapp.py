@@ -168,12 +168,26 @@ async def handle_inbound_whatsapp_message(
                 if bound_store.whatsapp_phone_number_id and not bound_store.whatsapp_phone_number_id.startswith("pending-"):
                     active_phone_id = bound_store.whatsapp_phone_number_id
 
-        # Fallback to first active store if still unassigned
+        # If still unassigned, prompt customer to bind to a store sandbox
         if not active_store_id:
-            default_store = db.query(Store).filter(Store.is_active == True).first()
-            if default_store:
-                active_store_id = default_store.id
-                active_system_prompt = default_store.system_prompt
+            logger.warning(f"⚠️ [WhatsApp Inbound] Unmapped sender {clean_phone} without active store binding.")
+            unbound_reply = (
+                "👋 Welcome to AutoCommerce WhatsApp Assistant!\n\n"
+                "To connect this conversation to your store sandbox, please send:\n"
+                "*CONNECT <STORE_ID>*\n\n"
+                "You can find your Store ID in your Merchant Dashboard."
+            )
+            await whatsapp_service.send_text_message(
+                to_phone_number=clean_phone,
+                message_text=unbound_reply,
+                token=whatsapp_access_token or settings.WHATSAPP_TOKEN,
+                phone_number_id=phone_number_id or settings.WHATSAPP_PHONE_NUMBER_ID,
+            )
+            return {
+                "status": "unbound_store",
+                "reply": unbound_reply,
+                "store_id": None,
+            }
 
         session_id = ChatService.build_session_id(customer_phone=clean_phone, store_id=active_store_id)
         chat_service = ChatService(db)
@@ -186,10 +200,11 @@ async def handle_inbound_whatsapp_message(
             max_inactivity_hours=4.0,
         )
 
-        # 4. Track cart engagement
+        # 4. Track cart engagement strictly scoped by active store_id
         cart = track_cart_engagement(
             sender_phone=clean_phone,
             message_text=clean_text,
+            store_id=active_store_id,
             db=db,
         )
 

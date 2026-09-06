@@ -22,23 +22,24 @@ from app.services.supabase_service import (
 logger = logging.getLogger(__name__)
 
 DEFAULT_SYSTEM_INSTRUCTION = (
-    "You are a friendly, helpful WhatsApp customer support assistant for the AutoCommerce store.\n\n"
+    "You are a friendly, helpful WhatsApp customer shopping and support assistant for the store.\n\n"
     "CRITICAL RULES & DIRECTIVES:\n"
-    "1. Keep replies concise, helpful, and natural (1 to 3 short sentences maximum). Ideal for WhatsApp reading.\n"
-    "2. NO HALLUCINATIONS: When a customer asks about order status or product stock/inventory, you MUST call the provided tools (track_order, check_product_stock) to retrieve real-time data from the store database before answering.\n"
-    "3. MULTI-TURN CONTEXT RESOLUTION: Use the conversation history to understand references (e.g. 'aur iski price kya hai?', 'is it available in blue?', 'where is it now?') based on previous products or orders discussed.\n"
-    "4. Language Matching: Match the customer's language. If they message in Roman Urdu (e.g., 'mera order kab tak deliver hoga?', 'kya delivery free hai?', 'kya COD hai?'), reply warmly and politely in Roman Urdu (e.g., 'Aapka order 2-4 business days me deliver ho jayega. Cash on Delivery (COD) bhi available hai!'). If they write in English, reply in English.\n"
-    "5. Store Knowledge & Policies:\n"
+    "1. Concise WhatsApp Format: Keep replies concise, helpful, and natural (1 to 3 short sentences maximum). Ideal for mobile chat reading. Use emojis sparingly and warmly (e.g., 📦, ✨, 😊).\n"
+    "2. STRICT GROUNDING & NO HALLUCINATIONS: You MUST ONLY refer to products, orders, inventory, and discounts that actually exist in the database. NEVER invent, assume, or hallucinate product names (e.g. lamps, headphones, shirts), prices, inventory, cart items, or coupon codes.\n"
+    "3. TOOL USAGE: When a customer asks about order status or product stock/inventory, you MUST call the provided tools (track_order, check_product_stock) to retrieve real-time data from the store database before answering.\n"
+    "4. EMPTY CATALOG BEHAVIOR: If the store catalog is empty (0 products in database), or if product lookup returns 'Product not found' / empty results, you MUST politely inform the customer that the store catalog is currently being updated or that the item is not available. Do NOT recommend or invent fake items.\n"
+    "5. MULTI-TURN CONTEXT RESOLUTION: Use the conversation history to understand references (e.g. 'aur iski price kya hai?', 'is it available in blue?', 'where is it now?') based on previous products or orders discussed in this thread.\n"
+    "6. Language Matching: Match the customer's language. If they message in Roman Urdu (e.g., 'mera order kab tak deliver hoga?', 'kya delivery free hai?', 'kya COD hai?'), reply warmly and politely in Roman Urdu (e.g., 'Aapka order 2-4 business days me deliver ho jayega. Cash on Delivery (COD) bhi available hai!'). If they write in English, reply in English.\n"
+    "7. Store Knowledge & Policies:\n"
     "   - Standard Delivery Time: 2 to 4 business days.\n"
     "   - Payment Methods: Cash on Delivery (COD) is available nationwide.\n"
     "   - Return Policy: 7-day hassle-free return and replacement policy.\n"
-    "   - Cart & Discounts: If the customer context has an active discount code or cart items, mention them warmly to encourage checkout.\n"
-    "6. Format: Do NOT use markdown headers, long bulleted lists, or robotic greetings. Use a warm tone and suitable emojis (e.g., 📦, ✨, 😊)."
+    "   - Cart & Discounts: Only mention active cart items or promotional discounts if explicitly verified in the Customer Store Context. If none are provided, do NOT mention any carts or promo codes."
 )
 
 FALLBACK_SUPPORT_REPLY = (
     "Thanks for reaching out! 😊 Standard delivery takes 2-4 business days with Cash on Delivery (COD) available nationwide. "
-    "We also offer a 7-day return policy. If you have an active cart, your discount is already applied via the checkout link!"
+    "We also offer a 7-day return policy. How can I help you today?"
 )
 
 # Gemini Tool Declarations for Function Calling
@@ -65,7 +66,7 @@ GEMINI_FUNCTION_DECLARATIONS = [
             "properties": {
                 "product_name": {
                     "type": "STRING",
-                    "description": "The name or search keyword of the product in the store catalog (e.g., 'Minimalist Ceramic Lamp', 'Headphones')."
+                    "description": "The name or search keyword of the product in the store catalog (e.g., 'Sneakers', 'Hoodie', 'T-Shirt')."
                 }
             },
             "required": ["product_name"]
@@ -94,6 +95,8 @@ class AISupportService:
         customer_message: str,
         cart_session: Optional[CartSession] = None,
         customer_phone: Optional[str] = None,
+        store_id: Optional[Any] = None,
+        db: Optional[Any] = None,
     ) -> str:
         """Construct user prompt incorporating customer cart, order, and discount context if available."""
         context_parts = []
@@ -101,7 +104,31 @@ class AISupportService:
         if customer_phone:
             context_parts.append(f"Customer Phone: {customer_phone}")
 
-        if cart_session:
+        # Check store catalog status if db is available
+        if db is not None and store_id is not None:
+            try:
+                import uuid
+                from app.models.product import Product
+                from app.models.integration import StoreIntegration
+
+                store_uuid = uuid.UUID(str(store_id)) if not isinstance(store_id, uuid.UUID) else store_id
+                prod_count = db.query(Product).filter(Product.store_id == store_uuid).count()
+                has_shopify = (
+                    db.query(StoreIntegration)
+                    .filter(StoreIntegration.store_id == store_uuid, StoreIntegration.platform == "shopify")
+                    .count()
+                    > 0
+                )
+
+                if prod_count == 0 and not has_shopify:
+                    context_parts.append(
+                        "Store Catalog Status: EMPTY (0 products currently in catalog). "
+                        "If the customer asks for products or shopping recommendations, inform them politely that the catalog is currently being updated."
+                    )
+            except Exception as e:
+                logger.warning(f"Error inspecting store catalog in prompt builder: {e}")
+
+        if cart_session and getattr(cart_session, "abandoned_items", None):
             if cart_session.customer_name and cart_session.customer_name != "Valued Customer":
                 context_parts.append(f"Customer Name: {cart_session.customer_name}")
             if cart_session.discount_code:
@@ -128,7 +155,7 @@ class AISupportService:
                 from app.services.ecommerce_service import ecommerce_service
                 order_num = order_match.group(1).strip()
                 if order_num:
-                    order_res = ecommerce_service.get_order_by_number(order_num, phone=customer_phone)
+                    order_res = ecommerce_service.get_order_by_number(order_num, phone=customer_phone, store_id=store_id, db=db)
                     if order_res.get("success"):
                         context_parts.append(
                             f"Verified Order #{order_res.get('order_id')} Status: {order_res.get('status')}, "
@@ -504,6 +531,8 @@ class AISupportService:
             customer_message=customer_message.strip(),
             cart_session=cart_session,
             customer_phone=customer_phone,
+            store_id=store_id,
+            db=db,
         )
 
         gemini_key = (

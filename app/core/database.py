@@ -121,6 +121,7 @@ def create_db_and_tables():
                 conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id)"))
                 conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id)"))
                 conn.execute(text("ALTER TABLE chat_histories ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id)"))
+                conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id)"))
     except Exception as e:
         # Pass gracefully if already migrated
         pass

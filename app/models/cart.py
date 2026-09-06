@@ -3,7 +3,8 @@ SQLAlchemy Model for Abandoned Cart Sessions and Recovery Discounts.
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Boolean, JSON, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, JSON, DateTime, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
 
 
@@ -11,6 +12,7 @@ class CartSession(Base):
     __tablename__ = "cart_sessions"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    store_id = Column(UUID(as_uuid=True), ForeignKey("stores.id"), nullable=True, index=True)
     session_id = Column(String(100), unique=True, index=True, nullable=False)
     customer_email = Column(String(150), index=True, nullable=False)
     customer_name = Column(String(150), nullable=True, default="Valued Customer")
@@ -33,6 +35,7 @@ class CartSession(Base):
     def to_dict(self):
         return {
             "id": self.id,
+            "store_id": str(self.store_id) if self.store_id else None,
             "session_id": self.session_id,
             "customer_email": self.customer_email,
             "customer_name": self.customer_name or "Valued Customer",

@@ -164,7 +164,15 @@ class EcommerceService:
         if db_res.get("success") or db_res.get("security_error"):
             return db_res
 
-        # 3. Fallback to mock data store
+        # 3. If store_id is provided, do NOT fall back to mock orders
+        if store_id is not None:
+            return {
+                "success": False,
+                "error": f"Order #{cleaned_id} was not found in the store records.",
+                "suggested_action": "Please verify your order number.",
+            }
+
+        # 4. Fallback to mock data store only in standalone local PoC mode without store_id
         return self._lookup_mock_order(cleaned_id, phone=phone)
 
     def _lookup_db_order(
@@ -185,7 +193,7 @@ class EcommerceService:
         try:
             filters = [
                 Order.order_number == order_id,
-                Order.order_number.ilike(f"#{order_id}"),
+                Order.order_number == f"#{order_id}",
                 Order.order_number.ilike(order_id),
             ]
             if order_id.isdigit():
@@ -207,11 +215,6 @@ class EcommerceService:
                 return {"success": False}
 
             order_phone = getattr(order, "customer_phone", None)
-            if not order_phone:
-                for mo in ORDERS:
-                    if mo.get("order_id", "").lower() == str(order_id).lower():
-                        order_phone = mo.get("customer_phone")
-                        break
 
             if phone and order_phone and not self.phones_match(phone, order_phone):
                 logger.warning(
@@ -454,10 +457,18 @@ class EcommerceService:
 
         # 2. Query Database (Product table for tenant store_id)
         db_items = self._lookup_db_products(query_clean, size=size, store_id=store_id, db=db)
-        if db_items and db_items[0].get("success") is not False:
+        if db_items and len(db_items) > 0 and db_items[0].get("success") is not False:
             return db_items
 
-        # 3. Fallback to mock catalog
+        # 3. If store_id is provided, do NOT fall back to mock products
+        if store_id is not None:
+            return [{
+                "success": False,
+                "query": query,
+                "message": f"No products found matching '{query}' in the store catalog.",
+            }]
+
+        # 4. Fallback to mock catalog only in standalone local PoC mode without store_id
         return self._lookup_mock_products(query_clean, size=size)
 
     def _lookup_db_products(

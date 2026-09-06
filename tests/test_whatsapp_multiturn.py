@@ -171,26 +171,130 @@ class TestWhatsAppMultiTurnMemory(unittest.TestCase):
 
     def test_handle_inbound_whatsapp_message_persists_chat_history(self):
         """Test end-to-end handle_inbound_whatsapp_message stores both user query and AI reply in ChatHistory."""
-        with patch("app.services.whatsapp_service.whatsapp_service.send_text_message") as mock_send:
-            mock_send.return_value = {"success": True, "mock": True}
+        import uuid
+        from app.models.store import Store
+        suffix = uuid.uuid4().hex[:8]
+        test_store = Store(
+            name=f"Test Store MT {suffix}",
+            owner_email=f"test.mt.{suffix}@example.com",
+            whatsapp_phone_number_id=f"phone_mt_{suffix}",
+            system_prompt="You are an assistant for Test Store MT.",
+            is_active=True,
+        )
+        self.db.add(test_store)
+        self.db.commit()
+        self.db.refresh(test_store)
 
-            asyncio.run(
-                handle_inbound_whatsapp_message(
-                    sender_phone=self.test_phone,
-                    message_text="Hello, what are your delivery times?",
-                    message_id="wamid.test_multi_turn_001",
+        try:
+            with patch("app.services.whatsapp_service.whatsapp_service.send_text_message") as mock_send:
+                mock_send.return_value = {"success": True, "mock": True}
+
+                asyncio.run(
+                    handle_inbound_whatsapp_message(
+                        sender_phone=self.test_phone,
+                        message_text="Hello, what are your delivery times?",
+                        message_id="wamid.test_multi_turn_001",
+                        store_id=test_store.id,
+                        system_prompt=test_store.system_prompt,
+                    )
                 )
+
+            # Verify ChatHistory in database
+            records = self.db.query(ChatHistory).filter(ChatHistory.session_id.contains(self.test_phone)).order_by(ChatHistory.created_at.asc()).all()
+
+            self.assertEqual(len(records), 2)
+            self.assertEqual(records[0].role, "user")
+            self.assertEqual(records[0].content, "Hello, what are your delivery times?")
+            self.assertEqual(records[1].role, "assistant")
+            self.assertIsNotNone(records[1].content)
+        finally:
+            self.db.query(ChatHistory).filter(ChatHistory.session_id.contains(self.test_phone)).delete()
+            self.db.query(Store).filter(Store.id == test_store.id).delete()
+            self.db.commit()
+
+    def test_fresh_store_empty_catalog_and_zero_cart_no_hallucination(self):
+        """Verify that a fresh store with 0 products and no cart never mentions Ceramic Lamp, Headphones, or RECOVER15."""
+        import uuid
+        from app.models.store import Store
+        from app.models.cart import CartSession
+        from app.services.cart_recovery import track_cart_engagement
+        from app.services.ecommerce_service import ecommerce_service
+
+        suffix = uuid.uuid4().hex[:8]
+        store_fresh = Store(
+            name=f"Brand New Store {suffix}",
+            owner_email=f"fresh.{suffix}@example.com",
+            whatsapp_phone_number_id=f"phone_fresh_{suffix}",
+            system_prompt="You are a support assistant for Brand New Store.",
+            is_active=True,
+        )
+        store_other = Store(
+            name=f"Other Store {suffix}",
+            owner_email=f"other.{suffix}@example.com",
+            whatsapp_phone_number_id=f"phone_other_{suffix}",
+            system_prompt="You are a support assistant for Other Store.",
+            is_active=True,
+        )
+        self.db.add_all([store_fresh, store_other])
+        self.db.commit()
+        self.db.refresh(store_fresh)
+        self.db.refresh(store_other)
+
+        try:
+            # 1. Product lookup for fresh store with 0 products returns not found
+            stock_res = ecommerce_service.get_product_stock("lamp", store_id=store_fresh.id, db=self.db)
+            self.assertFalse(stock_res[0].get("success"))
+            self.assertIn("No products found", stock_res[0].get("message", ""))
+
+            # 2. Add an abandoned cart for OTHER store with this phone number
+            cart_other = CartSession(
+                session_id=f"sess_other_{self.test_phone}_{suffix}",
+                store_id=store_other.id,
+                customer_email="other.cust@example.com",
+                customer_phone=self.test_phone,
+                customer_name="Talal Test",
+                discount_code="RECOVER15",
+                discount_percentage=15,
+                abandoned_items=[{"name": "Minimalist Ceramic Lamp", "price": 49.99, "quantity": 1}],
             )
+            self.db.add(cart_other)
+            self.db.commit()
 
-        # Verify ChatHistory in database
-        records = self.db.query(ChatHistory).filter(ChatHistory.session_id.contains(self.test_phone)).order_by(ChatHistory.created_at.asc()).all()
+            # 3. Track cart engagement for FRESH store -> returns None (isolated from other store)
+            cart_found = track_cart_engagement(
+                sender_phone=self.test_phone,
+                message_text="Do I have a discount?",
+                store_id=store_fresh.id,
+                db=self.db,
+            )
+            self.assertIsNone(cart_found)
 
-        self.assertEqual(len(records), 2)
-        self.assertEqual(records[0].role, "user")
-        self.assertEqual(records[0].content, "Hello, what are your delivery times?")
-        self.assertEqual(records[1].role, "assistant")
-        self.assertIsNotNone(records[1].content)
-        self.assertIn("delivery", records[1].content.lower())
+            # 4. Generate AI reply for fresh store
+            with patch("app.services.whatsapp_service.whatsapp_service.send_text_message") as mock_send:
+                mock_send.return_value = {"success": True, "mock": True}
+
+                res = asyncio.run(
+                    handle_inbound_whatsapp_message(
+                        sender_phone=self.test_phone,
+                        message_text="What products do you have available?",
+                        message_id="wamid.test_fresh_001",
+                        store_id=store_fresh.id,
+                        system_prompt=store_fresh.system_prompt,
+                    )
+                )
+
+                reply_text = res.get("reply", "")
+                # Must NOT mention fake products or fake discounts
+                self.assertNotIn("Ceramic Lamp", reply_text)
+                self.assertNotIn("Headphones", reply_text)
+                self.assertNotIn("RECOVER15", reply_text)
+                self.assertNotIn("Talal", reply_text)
+
+        finally:
+            self.db.query(ChatHistory).filter(ChatHistory.session_id.contains(self.test_phone)).delete()
+            self.db.query(CartSession).filter(CartSession.session_id == f"sess_other_{self.test_phone}_{suffix}").delete()
+            self.db.query(Store).filter(Store.id.in_([store_fresh.id, store_other.id])).delete()
+            self.db.commit()
 
 
 if __name__ == "__main__":
