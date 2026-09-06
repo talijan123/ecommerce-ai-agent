@@ -10,7 +10,12 @@ from mock_data import PRODUCTS, ORDERS, CART_SESSIONS
 from app.services.ecommerce_service import ecommerce_service
 
 
-def get_order_status(order_id: str, phone: Optional[str] = None) -> Dict[str, Any]:
+def get_order_status(
+    order_id: str,
+    phone: Optional[str] = None,
+    store_id: Optional[Any] = None,
+    db: Optional[Any] = None,
+) -> Dict[str, Any]:
     """
     Retrieve real-time status and shipping details for a customer order by its Order ID.
     Enforces phone verification check when customer phone is provided.
@@ -18,15 +23,22 @@ def get_order_status(order_id: str, phone: Optional[str] = None) -> Dict[str, An
     Args:
         order_id: The unique identifier of the order (e.g., '1042', '#1043').
         phone: Optional customer phone number for security authorization.
+        store_id: Optional tenant Store ID for multi-tenant isolation.
+        db: Optional active database session.
 
     Returns:
         A dictionary containing order status, items, carrier, tracking information,
         and estimated delivery date, or an error/security message.
     """
-    return ecommerce_service.get_order_by_number(order_id=order_id, phone=phone)
+    return ecommerce_service.get_order_by_number(order_id=order_id, phone=phone, store_id=store_id, db=db)
 
 
-def check_product_inventory(product_name: str, size: Optional[str] = None) -> List[Dict[str, Any]]:
+def check_product_inventory(
+    product_name: str,
+    size: Optional[str] = None,
+    store_id: Optional[Any] = None,
+    db: Optional[Any] = None,
+) -> List[Dict[str, Any]]:
     """
     Check stock availability, pricing, and details for a product by name and optional size variant.
     If the requested size is out of stock, provides available alternative sizes and related items.
@@ -34,12 +46,14 @@ def check_product_inventory(product_name: str, size: Optional[str] = None) -> Li
     Args:
         product_name: The name or keyword of the product (e.g., 'Classic White T-Shirt', 'Headphones').
         size: Optional size/variant (e.g., 'S', 'M', 'L', 'XL', '32', '10').
+        store_id: Optional tenant Store ID for multi-tenant isolation.
+        db: Optional active database session.
 
     Returns:
         A list of matching product variant objects containing inventory count, price,
         availability status, and alternatives if out of stock.
     """
-    return ecommerce_service.get_product_stock(query=product_name, size=size)
+    return ecommerce_service.get_product_stock(query=product_name, size=size, store_id=store_id, db=db)
 
 
 def apply_cart_recovery_discount(customer_email: str) -> Dict[str, Any]:

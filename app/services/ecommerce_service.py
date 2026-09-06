@@ -5,11 +5,15 @@ Supports both live Shopify REST Admin API and database/mock data fallback with p
 
 import os
 import re
+import uuid
 import logging
 import requests
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
+from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from app.core.config import settings
+from app.core.database import SessionLocal
 from mock_data import ORDERS, PRODUCTS
 
 logger = logging.getLogger(__name__)
@@ -19,6 +23,7 @@ class EcommerceService:
     """
     Handles order tracking lookups, product stock availability queries,
     and phone number security validation for live Shopify and local/mock stores.
+    Supports pure multi-tenant store_id resolution from database.
     """
 
     def __init__(
@@ -33,13 +38,54 @@ class EcommerceService:
 
     @property
     def is_shopify_configured(self) -> bool:
-        """Check if live Shopify credentials are provided."""
+        """Check if live Shopify credentials are provided in dev fallback."""
         return bool(
             self.shopify_store_url
             and self.shopify_access_token
             and "your-shop" not in self.shopify_store_url
             and "your_" not in self.shopify_access_token
         )
+
+    def _get_store_credentials(
+        self,
+        store_id: Optional[Any] = None,
+        db: Optional[Session] = None,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Retrieve store-specific Shopify domain and access token from database (store_integrations).
+        Falls back to local instance/env variables only if no database record exists for that store.
+        """
+        if store_id:
+            try:
+                store_uuid = uuid.UUID(str(store_id)) if not isinstance(store_id, uuid.UUID) else store_id
+                owns_db = False
+                session = db
+                if session is None:
+                    session = SessionLocal()
+                    owns_db = True
+                try:
+                    from app.models.integration import StoreIntegration
+                    integ = (
+                        session.query(StoreIntegration)
+                        .filter(
+                            StoreIntegration.store_id == store_uuid,
+                            StoreIntegration.platform == "shopify",
+                        )
+                        .first()
+                    )
+                    if integ and integ.access_token and integ.shop_domain:
+                        return integ.shop_domain, integ.access_token
+                finally:
+                    if owns_db:
+                        session.close()
+            except Exception as e:
+                logger.warning(f"[EcommerceService] Error fetching store credentials for {store_id}: {e}")
+
+        # Fallback to local dev settings
+        if self.is_shopify_configured:
+            return self.shopify_store_url, self.shopify_access_token
+
+        return None, None
 
     @staticmethod
     def normalize_phone(phone: Optional[str]) -> str:
@@ -72,7 +118,13 @@ class EcommerceService:
 
         return False
 
-    def get_order_by_number(self, order_id: str, phone: Optional[str] = None) -> Dict[str, Any]:
+    def get_order_by_number(
+        self,
+        order_id: str,
+        phone: Optional[str] = None,
+        store_id: Optional[Any] = None,
+        db: Optional[Session] = None,
+    ) -> Dict[str, Any]:
         """
         Retrieve order status, fulfillment, carrier, tracking info, and item list by Order ID.
         Performs phone security verification if a customer phone number is provided or present on the order.
@@ -80,6 +132,8 @@ class EcommerceService:
         Args:
             order_id: The order identifier (e.g., '1042', '#1043').
             phone: Optional customer's phone number for security verification.
+            store_id: Optional tenant Store ID for multi-tenant routing.
+            db: Optional active SQLAlchemy session.
 
         Returns:
             Structured dictionary with order details or security/lookup error.
@@ -93,21 +147,121 @@ class EcommerceService:
 
         cleaned_id = re.sub(r"[^\w-]", "", str(order_id)).lstrip("#").strip()
 
-        # 1. If Shopify credentials are configured, query Shopify API
-        if self.is_shopify_configured:
-            shopify_res = self._fetch_shopify_order(cleaned_id, phone=phone)
+        # 1. If store has live Shopify credentials, query Shopify API
+        shop_domain, access_token = self._get_store_credentials(store_id=store_id, db=db)
+        if shop_domain and access_token:
+            shopify_res = self._fetch_shopify_order(
+                cleaned_id,
+                phone=phone,
+                shop_domain=shop_domain,
+                access_token=access_token,
+            )
             if shopify_res.get("success") or shopify_res.get("security_error"):
                 return shopify_res
 
-        # 2. Fallback to local database / mock data store
+        # 2. Lookup from Database (Order table for tenant store_id)
+        db_res = self._lookup_db_order(cleaned_id, phone=phone, store_id=store_id, db=db)
+        if db_res.get("success") or db_res.get("security_error"):
+            return db_res
+
+        # 3. Fallback to mock data store
         return self._lookup_mock_order(cleaned_id, phone=phone)
 
-    def _fetch_shopify_order(self, order_number: str, phone: Optional[str] = None) -> Dict[str, Any]:
+    def _lookup_db_order(
+        self,
+        order_id: str,
+        phone: Optional[str] = None,
+        store_id: Optional[Any] = None,
+        db: Optional[Session] = None,
+    ) -> Dict[str, Any]:
+        """Lookup order from database Order table."""
+        from app.models.order import Order
+        owns_db = False
+        session = db
+        if session is None:
+            session = SessionLocal()
+            owns_db = True
+
+        try:
+            filters = [
+                Order.order_number == order_id,
+                Order.order_number.ilike(f"#{order_id}"),
+                Order.order_number.ilike(order_id),
+            ]
+            if order_id.isdigit():
+                try:
+                    filters.append(Order.id == int(order_id))
+                except Exception:
+                    pass
+
+            query = session.query(Order).filter(or_(*filters))
+            if store_id is not None:
+                try:
+                    store_uuid = uuid.UUID(str(store_id)) if not isinstance(store_id, uuid.UUID) else store_id
+                    query = query.filter(Order.store_id == store_uuid)
+                except Exception:
+                    pass
+
+            order = query.first()
+            if not order:
+                return {"success": False}
+
+            order_phone = getattr(order, "customer_phone", None)
+            if not order_phone:
+                for mo in ORDERS:
+                    if mo.get("order_id", "").lower() == str(order_id).lower():
+                        order_phone = mo.get("customer_phone")
+                        break
+
+            if phone and order_phone and not self.phones_match(phone, order_phone):
+                logger.warning(
+                    f"🔒 [Security Check Failed] Phone {phone} does not match order #{order_id} phone {order_phone}"
+                )
+                return {
+                    "success": False,
+                    "security_error": True,
+                    "order_id": getattr(order, "order_number", order_id),
+                    "error": "For security and privacy reasons, order tracking details can only be shared with the phone number registered on the order.",
+                    "suggested_action": "Ask the customer to confirm the phone number or email registered when placing the order.",
+                }
+
+            return {
+                "success": True,
+                "order_id": getattr(order, "order_number", order_id),
+                "customer_name": getattr(order, "customer_name", "Valued Customer"),
+                "status": getattr(order, "status", "Processing"),
+                "carrier": getattr(order, "carrier", None),
+                "tracking_number": getattr(order, "tracking_number", None),
+                "tracking_url": getattr(order, "tracking_url", None),
+                "estimated_delivery": getattr(order, "estimated_delivery", "2-4 business days"),
+                "items": getattr(order, "items", []) or [],
+                "total_amount": float(getattr(order, "total_amount", 0.0) or 0.0),
+                "shipping_address": getattr(order, "shipping_address", None),
+                "source": "Store Database",
+            }
+        except Exception as e:
+            logger.warning(f"[EcommerceService] Error querying DB order: {e}")
+            return {"success": False}
+        finally:
+            if owns_db:
+                session.close()
+
+    def _fetch_shopify_order(
+        self,
+        order_number: str,
+        phone: Optional[str] = None,
+        shop_domain: Optional[str] = None,
+        access_token: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Query Shopify Admin REST API for order details with security phone validation."""
-        store_domain = self.shopify_store_url.replace("https://", "").replace("http://", "").strip("/")
-        url = f"https://{store_domain}/admin/api/{self.shopify_api_version}/orders.json"
+        target_domain = (shop_domain or self.shopify_store_url).replace("https://", "").replace("http://", "").strip("/")
+        target_token = access_token or self.shopify_access_token
+        if not target_domain or not target_token:
+            return {"success": False, "error": "Shopify credentials not configured."}
+
+        url = f"https://{target_domain}/admin/api/{self.shopify_api_version}/orders.json"
         headers = {
-            "X-Shopify-Access-Token": self.shopify_access_token,
+            "X-Shopify-Access-Token": target_token,
             "Content-Type": "application/json",
         }
         params = {
@@ -258,7 +412,13 @@ class EcommerceService:
             "suggested_action": "Ask customer to verify their order number or the email associated with the order."
         }
 
-    def get_product_stock(self, query: str, size: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_product_stock(
+        self,
+        query: str,
+        size: Optional[str] = None,
+        store_id: Optional[Any] = None,
+        db: Optional[Session] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Check product stock, price, and variant availability across Shopify or store catalog.
         Provides available alternative sizes if requested variant is out of stock.
@@ -266,6 +426,8 @@ class EcommerceService:
         Args:
             query: Product name or keyword (e.g., 'Classic White T-Shirt', 'Headphones').
             size: Optional size/variant code (e.g., 'S', 'M', 'L', 'XL', '10').
+            store_id: Optional tenant Store ID for multi-tenant routing.
+            db: Optional active SQLAlchemy session.
 
         Returns:
             List of matching product objects with stock counts and alternative recommendations.
@@ -278,21 +440,152 @@ class EcommerceService:
 
         query_clean = query.strip()
 
-        # 1. If Shopify is configured, query Shopify Products API
-        if self.is_shopify_configured:
-            shopify_items = self._fetch_shopify_products(query_clean, size=size)
+        # 1. Check if store has live Shopify credentials
+        shop_domain, access_token = self._get_store_credentials(store_id=store_id, db=db)
+        if shop_domain and access_token:
+            shopify_items = self._fetch_shopify_products(
+                query_clean,
+                size=size,
+                shop_domain=shop_domain,
+                access_token=access_token,
+            )
             if shopify_items and shopify_items[0].get("success") is not False:
                 return shopify_items
 
-        # 2. Fallback to catalog / mock database
+        # 2. Query Database (Product table for tenant store_id)
+        db_items = self._lookup_db_products(query_clean, size=size, store_id=store_id, db=db)
+        if db_items and db_items[0].get("success") is not False:
+            return db_items
+
+        # 3. Fallback to mock catalog
         return self._lookup_mock_products(query_clean, size=size)
 
-    def _fetch_shopify_products(self, query: str, size: Optional[str] = None) -> List[Dict[str, Any]]:
+    def _lookup_db_products(
+        self,
+        query: str,
+        size: Optional[str] = None,
+        store_id: Optional[Any] = None,
+        db: Optional[Session] = None,
+    ) -> List[Dict[str, Any]]:
+        """Query products from PostgreSQL Product table for tenant store_id."""
+        from app.models.product import Product
+        owns_db = False
+        session = db
+        if session is None:
+            session = SessionLocal()
+            owns_db = True
+
+        try:
+            q_clean = query.strip().lower()
+            stmt = session.query(Product)
+            if store_id is not None:
+                try:
+                    store_uuid = uuid.UUID(str(store_id)) if not isinstance(store_id, uuid.UUID) else store_id
+                    stmt = stmt.filter(Product.store_id == store_uuid)
+                except Exception:
+                    pass
+
+            # Search by title, sku, category
+            search_filters = [
+                Product.title.ilike(f"%{q_clean}%"),
+                Product.sku.ilike(f"%{q_clean}%"),
+                Product.category.ilike(f"%{q_clean}%"),
+            ]
+            matching_products = stmt.filter(or_(*search_filters)).limit(10).all()
+
+            if not matching_products:
+                return []
+
+            results: List[Dict[str, Any]] = []
+            for p in matching_products:
+                variants = p.size_variants or []
+                prod_title = p.title
+
+                if size:
+                    cleaned_size = size.strip().upper()
+                    exact_var = next(
+                        (v for v in variants if str(v.get("size", "") or v.get("title", "")).upper() == cleaned_size),
+                        None,
+                    )
+                    alt_vars = [
+                        {
+                            "size": v.get("size") or v.get("title"),
+                            "stock_count": int(v.get("stock") or v.get("stock_count") or 0),
+                            "price": float(v.get("price") or p.price),
+                        }
+                        for v in variants
+                        if str(v.get("size", "") or v.get("title", "")).upper() != cleaned_size
+                        and int(v.get("stock") or v.get("stock_count") or 0) > 0
+                    ]
+
+                    if exact_var:
+                        stock = int(exact_var.get("stock") or exact_var.get("stock_count") or 0)
+                        in_stock = stock > 0
+                        var_price = float(exact_var.get("price") or p.price)
+                        results.append({
+                            "product_id": str(p.id),
+                            "product_name": prod_title,
+                            "sku": p.sku,
+                            "category": p.category,
+                            "requested_size": size,
+                            "in_stock": in_stock,
+                            "stock_count": stock,
+                            "price": var_price,
+                            "description": p.description,
+                            "alternative_available_sizes": alt_vars if not in_stock else [],
+                            "note": "Item is available." if in_stock else "Item in requested size is currently OUT OF STOCK.",
+                            "source": "Store Database",
+                        })
+                    else:
+                        results.append({
+                            "product_id": str(p.id),
+                            "product_name": prod_title,
+                            "sku": p.sku,
+                            "category": p.category,
+                            "requested_size": size,
+                            "in_stock": False,
+                            "message": f"Size '{size}' is not offered or not found for {prod_title}.",
+                            "available_variants": alt_vars,
+                            "source": "Store Database",
+                        })
+                else:
+                    results.append({
+                        "product_id": str(p.id),
+                        "product_name": prod_title,
+                        "sku": p.sku,
+                        "category": p.category,
+                        "in_stock": (p.stock_quantity or 0) > 0,
+                        "stock_count": p.stock_quantity or 0,
+                        "price": float(p.price or 0.0),
+                        "description": p.description,
+                        "size_variants": variants,
+                        "source": "Store Database",
+                    })
+
+            return results
+        except Exception as e:
+            logger.warning(f"[EcommerceService] Error querying DB products: {e}")
+            return []
+        finally:
+            if owns_db:
+                session.close()
+
+    def _fetch_shopify_products(
+        self,
+        query: str,
+        size: Optional[str] = None,
+        shop_domain: Optional[str] = None,
+        access_token: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """Query Shopify Admin REST API for products and variants."""
-        store_domain = self.shopify_store_url.replace("https://", "").replace("http://", "").strip("/")
-        url = f"https://{store_domain}/admin/api/{self.shopify_api_version}/products.json"
+        target_domain = (shop_domain or self.shopify_store_url).replace("https://", "").replace("http://", "").strip("/")
+        target_token = access_token or self.shopify_access_token
+        if not target_domain or not target_token:
+            return [{"success": False, "message": "Shopify credentials not configured."}]
+
+        url = f"https://{target_domain}/admin/api/{self.shopify_api_version}/products.json"
         headers = {
-            "X-Shopify-Access-Token": self.shopify_access_token,
+            "X-Shopify-Access-Token": target_token,
             "Content-Type": "application/json",
         }
         params = {"title": query, "limit": 10}

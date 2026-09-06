@@ -55,55 +55,6 @@ def mask_token(token: Optional[str]) -> str:
     return f"{token[:6]}...{token[-4:]} (length: {len(token)})"
 
 
-def update_env_file(shop_domain: str, access_token: str, env_path: Optional[str] = None) -> bool:
-    """Safely update or add SHOPIFY_STORE_URL and SHOPIFY_ACCESS_TOKEN in .env."""
-    if env_path is None:
-        env_path = os.path.join(PROJECT_ROOT, ".env")
-
-    if not os.path.exists(env_path):
-        # Create new .env file
-        try:
-            with open(env_path, "w", encoding="utf-8") as f:
-                f.write(f"SHOPIFY_STORE_URL={shop_domain}\n")
-                f.write(f"SHOPIFY_ACCESS_TOKEN={access_token}\n")
-            return True
-        except Exception as e:
-            print(f"⚠️  Could not create .env file: {e}")
-            return False
-
-    try:
-        with open(env_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-
-        has_store_url = False
-        has_access_token = False
-        new_lines = []
-
-        for line in lines:
-            stripped = line.strip()
-            if stripped.startswith("SHOPIFY_STORE_URL=") or stripped.startswith("SHOPIFY_STORE_URL ="):
-                new_lines.append(f"SHOPIFY_STORE_URL={shop_domain}\n")
-                has_store_url = True
-            elif stripped.startswith("SHOPIFY_ACCESS_TOKEN=") or stripped.startswith("SHOPIFY_ACCESS_TOKEN ="):
-                new_lines.append(f"SHOPIFY_ACCESS_TOKEN={access_token}\n")
-                has_access_token = True
-            else:
-                new_lines.append(line)
-
-        if not has_store_url:
-            new_lines.append(f"SHOPIFY_STORE_URL={shop_domain}\n")
-        if not has_access_token:
-            new_lines.append(f"SHOPIFY_ACCESS_TOKEN={access_token}\n")
-
-        with open(env_path, "w", encoding="utf-8") as f:
-            f.writelines(new_lines)
-
-        return True
-    except Exception as e:
-        print(f"⚠️  Could not update .env file: {e}")
-        return False
-
-
 def exchange_client_credentials(
     shop_domain: str,
     client_id: str,
@@ -179,10 +130,10 @@ def save_integration_and_sync(
     client_id: Optional[str] = None,
     store_id: Optional[str] = None,
     skip_sync: bool = False,
-    update_env: bool = True,
 ) -> Dict[str, Any]:
     """
-    Save or update store_integrations record and trigger catalog ingestion.
+    Save or update store_integrations record purely in database and trigger catalog ingestion.
+    Does NOT touch .env or global environment variables.
     """
     ensure_db_initialized()
     db = SessionLocal()
@@ -226,12 +177,6 @@ def save_integration_and_sync(
         db.commit()
         db.refresh(integration)
         print(f"✅ Integration record saved in database (ID: {integration.id})")
-
-        # Update .env if requested
-        if update_env:
-            env_ok = update_env_file(clean_domain, access_token)
-            if env_ok:
-                print("💾 Saved SHOPIFY_STORE_URL and SHOPIFY_ACCESS_TOKEN to .env")
 
         # Ingest products
         sync_result = {}
@@ -277,11 +222,11 @@ def save_integration_and_sync(
 def run_interactive_or_cli():
     """Main CLI entrypoint."""
     parser = argparse.ArgumentParser(
-        description="Exchange Shopify Client ID & Secret for Store Access Token and sync catalog."
+        description="Exchange Shopify Client ID & Secret for Store Access Token and sync catalog (pure multi-tenant DB)."
     )
     parser.add_argument(
         "-s", "--shop",
-        default=os.getenv("SHOPIFY_STORE_URL") or "yqcncc-b0.myshopify.com",
+        default="yqcncc-b0.myshopify.com",
         help="Shopify store domain (e.g. yqcncc-b0.myshopify.com)",
     )
     parser.add_argument(
@@ -303,11 +248,6 @@ def run_interactive_or_cli():
         "--no-sync",
         action="store_true",
         help="Skip immediate product catalog sync",
-    )
-    parser.add_argument(
-        "--no-env",
-        action="store_true",
-        help="Do not update .env file with new credentials",
     )
 
     args = parser.parse_args()
@@ -388,7 +328,6 @@ def run_interactive_or_cli():
         client_id=client_id,
         store_id=args.store_id,
         skip_sync=args.no_sync,
-        update_env=not args.no_env,
     )
 
     print("\n" + "=" * 75)
