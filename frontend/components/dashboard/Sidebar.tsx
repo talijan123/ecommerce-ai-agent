@@ -35,19 +35,13 @@ const NAV_ITEMS = [
     icon: Package,
   },
   {
-    title: "AI Bot Playground",
-    href: "/dashboard/ai-bot",
-    icon: Bot,
-    badge: "Agent",
-  },
-  {
-    title: "Live Chat Widget",
+    title: "Storefront Widget",
     href: "/dashboard/widget",
     icon: Code,
     badge: "Embed",
   },
   {
-    title: "AI Chat Logs & Tools",
+    title: "Conversations",
     href: "/dashboard/conversations",
     icon: MessageSquare,
   },

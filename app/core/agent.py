@@ -18,17 +18,20 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = """You are an expert, autonomous customer support AI assistant for an e-commerce store.
 
 ### CORE DIRECTIVES & BEHAVIORAL RULES:
-1. **NO HALLUCINATIONS**: Never guess, assume, or fabricate order numbers, shipping details, tracking links, inventory stock levels, or discounts. You MUST ALWAYS call the appropriate tool first to retrieve verified real-time data from the store database before answering.
-2. **INVENTORY & OUT-OF-STOCK HANDLING**:
-   - If a customer asks for a product or size that is out of stock (stock_count = 0 or in_stock = false), explicitly state that the item is currently out of stock.
+1. **PUNCHY & CONCISE FORMAT**: Keep replies concise, helpful, and professional (1 to 3 short sentences maximum). Ideal for mobile web and chat reading. Never over-explain, lecture, or dump unnecessary text.
+2. **STRICT LANGUAGE & SCRIPT GROUNDING**:
+   - **Language Mirroring**: You MUST strictly reply in the EXACT language the customer speaks.
+   - If customer writes in English -> Reply ONLY in clean, fluent English.
+   - If customer writes in Roman Urdu (e.g. "Mera order 1043 kab deliver hoga?", "Ye shirt size M me available hai?", "Price kya hai?") -> Reply in clean, natural Roman Urdu (e.g. "Aapka order #1043 processing me hai aur 2-4 din mein deliver ho jayega.").
+   - **STRICTLY FORBIDDEN**: NEVER use Devanagari or Hindi script (e.g., absolutely forbid words like 'कृपया', 'नमस्ते', 'धन्यवाद', etc.). All South Asian context MUST be written strictly in Roman Urdu using Latin alphabet characters only.
+3. **NO HALLUCINATIONS & TOOL USAGE**:
+   - Never guess, assume, or fabricate order numbers, shipping details, tracking links, inventory stock levels, or discounts.
+   - You MUST ALWAYS call the appropriate tool first (track_order, check_product_stock, etc.) to retrieve verified real-time data from the store database before answering.
+4. **INVENTORY & OUT-OF-STOCK HANDLING**:
+   - If a customer asks for a product or size that is out of stock (stock_count = 0 or in_stock = false), state clearly that the item is currently out of stock.
    - Proactively suggest any other available sizes that are in stock for that product, or suggest related products.
-3. **MULTILINGUAL & ROMAN URDU SUPPORT**:
-   - You natively understand and communicate in multiple languages, especially Roman Urdu (e.g., "Mera order 1043 kab deliver hoga?", "Kia ye shirt size M me available hai?").
-   - When a user asks in Roman Urdu, respond politely and naturally in Roman Urdu (e.g., "Aapka order #1043 filhal processing me hai aur kal tak deliver ho jayega.").
-   - Maintain a courteous, professional, and friendly tone in all languages.
-4. **TOOL CALLING FORMAT**:
-   - Always extract parameters accurately (e.g., clean order IDs like '1042' from '#1042' or 'order 1042').
-   - Synthesize the tool output clearly, mentioning order status, tracking links, dates, and item names where relevant.
+5. **HUMAN ESCALATION**:
+   - If the customer asks to speak to a human, agent, representative, or manager (e.g., "I want to talk to a human", "manager se baat karni hai"), politely assure them that their request has been escalated to a human support agent/manager who will assist them shortly.
 """
 
 
@@ -67,6 +70,9 @@ def run_agent_turn(
         Tuple of (response_text, list_of_tool_invocations, success_flag)
     """
     import uuid as _uuid_mod
+    from app.services.ai_support_service import sanitize_ai_response
+    from app.models.store import Store
+
     parsed_store_uuid = None
     if store_id:
         try:
@@ -74,8 +80,21 @@ def run_agent_turn(
         except (ValueError, AttributeError):
             parsed_store_uuid = None
 
+    if parsed_store_uuid is None:
+        try:
+            first_store = db.query(Store).filter(Store.is_active == True).first()
+            if first_store:
+                parsed_store_uuid = first_store.id
+        except Exception:
+            pass
+
     chat_service = ChatService(db)
     client = get_openai_client()
+
+    # Check escalation intent
+    is_escalate = chat_service.is_escalation_intent(user_message) or chat_service.is_session_needs_human(session_id, store_id=parsed_store_uuid)
+    if is_escalate:
+        chat_service.mark_session_needs_human(session_id, store_id=parsed_store_uuid)
 
     # If email is provided in the request, append context if not already mentioned
     full_user_input = user_message
@@ -86,7 +105,13 @@ def run_agent_turn(
     prior_messages = chat_service.get_history(session_id, store_id=parsed_store_uuid, limit=12)
 
     # Persist the new user query
-    chat_service.add_message(session_id=session_id, role="user", content=full_user_input, store_id=parsed_store_uuid)
+    chat_service.add_message(
+        session_id=session_id,
+        role="user",
+        content=full_user_input,
+        store_id=parsed_store_uuid,
+        needs_human=True if is_escalate else None,
+    )
 
     # Build prompt messages array
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -97,11 +122,20 @@ def run_agent_turn(
 
     if client is None:
         # Fallback simulation when no live Groq or OpenAI key is configured
-        fallback_msg = (
-            "⚠️ [API Notice]: Neither GROQ_API_KEY nor OPENAI_API_KEY is configured in the environment. "
-            "Please configure your API key in environment variables to enable live AI responses."
+        if is_escalate:
+            fallback_msg = "I have flagged your request for a human support agent / manager. Our team will review this thread and reach out shortly."
+        else:
+            fallback_msg = (
+                "Thanks for reaching out! Our store offers 2-4 business day delivery nationwide with Cash on Delivery (COD) and 7-day hassle-free returns. "
+                "How can I assist you with your order or products today?"
+            )
+        chat_service.add_message(
+            session_id=session_id,
+            role="assistant",
+            content=fallback_msg,
+            store_id=parsed_store_uuid,
+            needs_human=True if is_escalate else None,
         )
-        chat_service.add_message(session_id=session_id, role="assistant", content=fallback_msg, store_id=parsed_store_uuid)
         return fallback_msg, [], True
 
     turn = 0
@@ -141,6 +175,7 @@ def run_agent_turn(
                 content=response_message.content,
                 tool_calls=tool_calls_dict,
                 store_id=parsed_store_uuid,
+                needs_human=True if is_escalate else None,
             )
 
             # Append to prompt messages
@@ -170,6 +205,7 @@ def run_agent_turn(
                     tool_call_id=tc.id,
                     name=func_name,
                     store_id=parsed_store_uuid,
+                    needs_human=True if is_escalate else None,
                 )
 
                 # Append tool result to context
@@ -184,8 +220,14 @@ def run_agent_turn(
             continue
 
         # Final assistant answer produced
-        final_answer = response_message.content or ""
-        chat_service.add_message(session_id=session_id, role="assistant", content=final_answer, store_id=parsed_store_uuid)
+        final_answer = sanitize_ai_response(response_message.content or "")
+        chat_service.add_message(
+            session_id=session_id,
+            role="assistant",
+            content=final_answer,
+            store_id=parsed_store_uuid,
+            needs_human=True if is_escalate else None,
+        )
         return final_answer, tools_invoked_log, True
 
     timeout_msg = "I'm sorry, I was unable to complete your request due to an execution limit."

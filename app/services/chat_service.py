@@ -143,7 +143,7 @@ class ChatService:
 
     @staticmethod
     def is_escalation_intent(text: Optional[str]) -> bool:
-        """Check if message indicates intent to speak with a human agent or request a refund."""
+        """Check if message indicates intent to speak with a human agent, manager, or request a refund/complaint."""
         if not text:
             return False
         keywords = [
@@ -152,17 +152,55 @@ class ChatService:
             "representative",
             "operator",
             "speak to someone",
+            "speak with someone",
             "talk to a person",
+            "talk to someone",
             "talk to human",
             "talk to agent",
+            "talk to representative",
+            "talk to manager",
+            "real person",
+            "manager",
+            "supervisor",
+            "support team",
+            "helpdesk",
             "refund",
             "complaint",
             "scam",
             "fraud",
-            "manager",
+            "human support",
+            "live agent",
+            # Roman Urdu / Hindi keywords
+            "insan",
+            "insaan",
+            "banda",
+            "banday se baat",
+            "human se baat",
+            "agent se baat",
+            "manager se baat",
+            "baat karni hai",
+            "call karo",
+            "rabta karo",
+            "kisi se baat karwao",
+            "admin se baat",
+            "shikayat",
+            "manager ko bulao",
         ]
         text_lower = text.lower()
         return any(kw in text_lower for kw in keywords)
+
+    def is_session_needs_human(self, session_id: str, store_id: Optional[Any] = None) -> bool:
+        """Check if any message in the session is already flagged as needing human review."""
+        try:
+            query = self.db.query(ChatHistory).filter(
+                ChatHistory.session_id == session_id,
+                ChatHistory.needs_human == True,
+            )
+            if store_id is not None:
+                query = query.filter(ChatHistory.store_id == store_id)
+            return query.count() > 0
+        except Exception:
+            return False
 
     def mark_session_needs_human(self, session_id: str, store_id: Optional[Any] = None) -> bool:
         """Flag all messages in the session as needing human review."""
@@ -195,9 +233,14 @@ class ChatService:
     ) -> Optional[ChatHistory]:
         """
         Store a message or tool execution step in the database with timestamps and tenant store_id.
+        Automatically flags and propagates needs_human if escalation intent is detected or session is escalated.
         """
         try:
-            flag = needs_human if needs_human is not None else self.is_escalation_intent(content)
+            if needs_human is not None:
+                flag = needs_human
+            else:
+                flag = self.is_escalation_intent(content) or self.is_session_needs_human(session_id, store_id=store_id)
+
             record = ChatHistory(
                 store_id=store_id,
                 session_id=session_id,
@@ -212,6 +255,10 @@ class ChatService:
             self.db.add(record)
             self.db.commit()
             self.db.refresh(record)
+
+            if flag:
+                self.mark_session_needs_human(session_id, store_id=store_id)
+
             return record
         except Exception:
             try:

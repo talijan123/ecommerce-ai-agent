@@ -286,6 +286,7 @@ export interface ChatHistoryRecord {
   name?: string;
   tool_call_id?: string;
   tool_calls?: any;
+  needs_human?: boolean;
   created_at?: string;
 }
 
@@ -308,6 +309,7 @@ export interface ConversationSummary {
   last_active: string | null;
   tools_used: string[];
   status: string;
+  needs_human?: boolean;
 }
 
 // ==========================================

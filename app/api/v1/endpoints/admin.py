@@ -137,7 +137,10 @@ def list_conversations(
             last_msg = msgs[-1]
 
             tools_used = [m.name for m in msgs if m.role == "tool" and m.name]
-            channel = "WhatsApp" if s_id.startswith("wa_") else "Web Widget"
+            channel = "WhatsApp" if ("wa_" in s_id) else "Web Widget"
+            has_human_escalation = any(bool(m.needs_human) for m in msgs)
+
+            status_val = "Needs Human" if has_human_escalation else ("Resolved" if len(msgs) > 1 else "Active")
 
             results.append({
                 "session_id": s_id,
@@ -146,7 +149,8 @@ def list_conversations(
                 "preview": first_user_msg,
                 "last_active": last_msg.created_at.isoformat() if last_msg.created_at else None,
                 "tools_used": list(set(tools_used)),
-                "status": "Resolved" if len(msgs) > 1 else "Active",
+                "status": status_val,
+                "needs_human": has_human_escalation,
             })
 
         results.sort(key=lambda x: x.get("last_active") or "", reverse=True)

@@ -22,14 +22,19 @@ from app.services.supabase_service import (
 logger = logging.getLogger(__name__)
 
 DEFAULT_SYSTEM_INSTRUCTION = (
-    "You are a friendly, helpful WhatsApp customer shopping and support assistant for the store.\n\n"
+    "You are a friendly, helpful, and concise customer shopping and support assistant for the store.\n\n"
     "CRITICAL RULES & DIRECTIVES:\n"
-    "1. Concise WhatsApp Format: Keep replies concise, helpful, and natural (1 to 3 short sentences maximum). Ideal for mobile chat reading. Use emojis sparingly and warmly (e.g., 📦, ✨, 😊).\n"
-    "2. STRICT GROUNDING & NO HALLUCINATIONS: You MUST ONLY refer to products, orders, inventory, and discounts that actually exist in the database. NEVER invent, assume, or hallucinate product names (e.g. lamps, headphones, shirts), prices, inventory, cart items, or coupon codes.\n"
-    "3. TOOL USAGE: When a customer asks about order status or product stock/inventory, you MUST call the provided tools (track_order, check_product_stock) to retrieve real-time data from the store database before answering.\n"
-    "4. EMPTY CATALOG BEHAVIOR: If the store catalog is empty (0 products in database), or if product lookup returns 'Product not found' / empty results, you MUST politely inform the customer that the store catalog is currently being updated or that the item is not available. Do NOT recommend or invent fake items.\n"
-    "5. MULTI-TURN CONTEXT RESOLUTION: Use the conversation history to understand references (e.g. 'aur iski price kya hai?', 'is it available in blue?', 'where is it now?') based on previous products or orders discussed in this thread.\n"
-    "6. Language Matching: Match the customer's language. If they message in Roman Urdu (e.g., 'mera order kab tak deliver hoga?', 'kya delivery free hai?', 'kya COD hai?'), reply warmly and politely in Roman Urdu (e.g., 'Aapka order 2-4 business days me deliver ho jayega. Cash on Delivery (COD) bhi available hai!'). If they write in English, reply in English.\n"
+    "1. PUNCHY & CONCISE FORMAT: Keep replies concise, helpful, and professional (1 to 3 short sentences maximum). "
+    "NEVER over-explain, lecture, or dump unnecessary text. Use emojis sparingly and warmly (e.g., 📦, ✨, 😊).\n"
+    "2. STRICT LANGUAGE & SCRIPT GROUNDING:\n"
+    "   - Language Mirroring: You MUST strictly reply in the EXACT language the customer speaks.\n"
+    "   - If the user writes in English -> Reply ONLY in clean, fluent English.\n"
+    "   - If the user writes in Roman Urdu (e.g., 'mera order kab deliver hoga?', 'price kya hai?') -> Reply in clean Roman Urdu (e.g., 'Aapka order 2-4 business days mein deliver ho jayega.').\n"
+    "   - STRICTLY FORBIDDEN: NEVER use Devanagari or Hindi script (e.g., absolutely forbid words like 'कृपया', 'नमस्ते', 'धन्यवाद', etc.). All South Asian context MUST be written strictly in Roman Urdu with Latin letters only.\n"
+    "3. STRICT GROUNDING & NO HALLUCINATIONS: You MUST ONLY refer to products, orders, inventory, and discounts that actually exist in the database. NEVER invent, assume, or hallucinate product names, prices, inventory, cart items, or coupon codes.\n"
+    "4. TOOL USAGE: When a customer asks about order status or product stock/inventory, you MUST call the provided tools (track_order, check_product_stock) to retrieve real-time data from the store database before answering.\n"
+    "5. EMPTY CATALOG BEHAVIOR: If the store catalog is empty (0 products in database), or if product lookup returns 'Product not found' / empty results, politely inform the customer that the item is currently not available or the catalog is being updated. Do NOT recommend or invent fake items.\n"
+    "6. HUMAN ESCALATION: If the customer asks to speak with a human agent, representative, or manager (e.g., 'I want to talk to a human', 'manager se baat karni hai'), politely acknowledge that their request is being escalated to a human support agent who will assist them shortly.\n"
     "7. Store Knowledge & Policies:\n"
     "   - Standard Delivery Time: 2 to 4 business days.\n"
     "   - Payment Methods: Cash on Delivery (COD) is available nationwide.\n"
@@ -41,6 +46,22 @@ FALLBACK_SUPPORT_REPLY = (
     "Thanks for reaching out! 😊 Standard delivery takes 2-4 business days with Cash on Delivery (COD) available nationwide. "
     "We also offer a 7-day return policy. How can I help you today?"
 )
+
+
+def sanitize_ai_response(text: Optional[str]) -> str:
+    """
+    Clean and enforce strict script and formatting rules:
+    1. Strip internal <think>...</think> tags.
+    2. Strip any Devanagari / Hindi script characters (\\u0900-\\u097F).
+    3. Normalize whitespace and clean blank edges.
+    """
+    if not text:
+        return ""
+    cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+    # Strip any Devanagari Unicode characters
+    cleaned = re.sub(r"[\u0900-\u097F]+", "", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
 
 # Gemini Tool Declarations for Function Calling
 GEMINI_FUNCTION_DECLARATIONS = [
@@ -312,8 +333,7 @@ class AISupportService:
                         # If no functionCall, extract text response
                         for p in parts:
                             if "text" in p and p["text"]:
-                                reply = p["text"].strip()
-                                reply = re.sub(r"<think>.*?</think>", "", reply, flags=re.DOTALL).strip()
+                                reply = sanitize_ai_response(p["text"])
                                 if reply:
                                     logger.info(f"🤖 [AISupport] Gemini ({clean_model}) final response generated.")
                                     return reply
@@ -335,8 +355,7 @@ class AISupportService:
                             if s_cands:
                                 s_parts = s_cands[0].get("content", {}).get("parts", [])
                                 if s_parts and "text" in s_parts[0]:
-                                    s_reply = s_parts[0]["text"].strip()
-                                    s_reply = re.sub(r"<think>.*?</think>", "", s_reply, flags=re.DOTALL).strip()
+                                    s_reply = sanitize_ai_response(s_parts[0]["text"])
                                     if s_reply:
                                         return s_reply
                         model_failed = True
@@ -487,8 +506,7 @@ class AISupportService:
                             continue
 
                         if resp_msg.content:
-                            reply = resp_msg.content.strip()
-                            reply = re.sub(r"<think>.*?</think>", "", reply, flags=re.DOTALL).strip()
+                            reply = sanitize_ai_response(resp_msg.content)
                             if reply:
                                 logger.info(f"🤖 [AISupport] Groq fallback ({model_name}) reply generated successfully.")
                                 return reply

@@ -440,3 +440,62 @@ class TestPhase3PostPurchaseAndEscalation:
                 assert r.needs_human is True
         finally:
             db.close()
+
+    def test_language_mirroring_and_script_sanitization(self):
+        """Test that AI responses strictly strip any Devanagari/Hindi characters and preserve clean Roman Urdu & English."""
+        from app.services.ai_support_service import sanitize_ai_response
+
+        # Devanagari / Hindi words to forbid
+        dirty_hindi = "नमस्ते कृपया आपका धन्यवाद! Aapka order 2 din me deliver ho jayega."
+        cleaned = sanitize_ai_response(dirty_hindi)
+        assert "नमस्ते" not in cleaned
+        assert "कृपया" not in cleaned
+        assert "धन्यवाद" not in cleaned
+        assert "Aapka order 2 din me deliver ho jayega." in cleaned
+
+        # Pure Roman Urdu
+        pure_roman_urdu = "Aapka order #1042 shippment ke liye tayyar hai. Cash on Delivery available hai!"
+        assert sanitize_ai_response(pure_roman_urdu) == pure_roman_urdu
+
+        # Clean English
+        pure_english = "Your order #1001 is on its way with standard 2-4 day delivery."
+        assert sanitize_ai_response(pure_english) == pure_english
+
+    def test_chat_api_escalation_persistence_and_admin_status(self, test_store_tenant):
+        """Test POST /api/v1/chat with manager/escalation query flags needs_human in DB and /api/v1/admin/conversations."""
+        store_id = test_store_tenant["store_id"]
+        store_uuid = test_store_tenant["store_uuid"]
+        session_id = f"esc_api_{uuid.uuid4().hex[:8]}"
+
+        # 1. Send escalation message via /api/v1/chat
+        res = client.post(
+            "/api/v1/chat",
+            json={
+                "session_id": session_id,
+                "message": "manager se baat karwao, mujhe human agent chahiye",
+                "store_id": store_id,
+            },
+        )
+        assert res.status_code == 200
+
+        # 2. Verify messages in database have needs_human = True
+        db = SessionLocal()
+        try:
+            records = db.query(ChatHistory).filter(
+                ChatHistory.session_id == session_id,
+                ChatHistory.store_id == store_uuid,
+            ).all()
+            assert len(records) >= 2
+            assert any(r.needs_human is True for r in records)
+        finally:
+            db.close()
+
+        # 3. Verify /api/v1/admin/conversations returns needs_human: True and status: "Needs Human"
+        admin_res = client.get(f"/api/v1/admin/conversations?store_id={store_id}")
+        assert admin_res.status_code == 200
+        conv_list = admin_res.json()
+        target_conv = next((c for c in conv_list if c["session_id"] == session_id), None)
+        assert target_conv is not None
+        assert target_conv["needs_human"] is True
+        assert target_conv["status"] == "Needs Human"
+

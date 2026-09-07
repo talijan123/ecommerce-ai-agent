@@ -18,6 +18,7 @@ import {
   Palette,
   Terminal,
   Zap,
+  ChevronDown,
 } from "lucide-react";
 import { Header } from "@/components/dashboard/Header";
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge } from "@/lib/ui";
@@ -45,6 +46,7 @@ export default function WidgetDashboardPage() {
   const [copiedScript, setCopiedScript] = useState(false);
   const [copiedWebhookShopify, setCopiedWebhookShopify] = useState(false);
   const [copiedWebhookWoo, setCopiedWebhookWoo] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     async function loadStores() {
@@ -89,7 +91,7 @@ export default function WidgetDashboardPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <Header
-        title="Live Chat Widget"
+        title="Storefront Widget"
         description="Deploy and customize your autonomous storefront AI assistant"
       />
 
@@ -233,47 +235,60 @@ export default function WidgetDashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Webhook URLs for Automatic Sync */}
-            <Card className="border-zinc-800/80 bg-zinc-900/70 shadow-md">
-              <CardHeader className="border-b border-zinc-800/80 pb-3">
-                <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-emerald-400" />
-                  <CardTitle className="text-sm text-zinc-200">Real-Time Webhook Endpoints</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-4 space-y-4 text-xs">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold text-zinc-300">Shopify Abandoned Checkouts Webhook</span>
-                    <button
-                      onClick={() => handleCopy(shopifyWebhook, "shopify")}
-                      className="text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1"
-                    >
-                      {copiedWebhookShopify ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                      <span>{copiedWebhookShopify ? "Copied" : "Copy"}</span>
-                    </button>
+            {/* Collapsed Advanced / Developer Settings Accordion */}
+            <Card className="border-zinc-800/80 bg-zinc-900/60 shadow-md overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="w-full p-4 flex items-center justify-between text-left hover:bg-zinc-800/40 transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-zinc-800 text-zinc-400 border border-zinc-700/60">
+                    <Sliders className="w-4 h-4" />
                   </div>
-                  <pre className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-400 font-mono text-[11px] overflow-x-auto">
-                    {shopifyWebhook}
-                  </pre>
+                  <div>
+                    <h3 className="text-xs sm:text-sm font-bold text-zinc-200">Advanced / Developer Settings</h3>
+                    <p className="text-[11px] text-zinc-400">Copy these links into your Shopify / WooCommerce webhook settings</p>
+                  </div>
                 </div>
+                <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${showAdvanced ? "rotate-180" : ""}`} />
+              </button>
 
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold text-zinc-300">WooCommerce Cart Webhook</span>
-                    <button
-                      onClick={() => handleCopy(wooWebhook, "woo")}
-                      className="text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1"
-                    >
-                      {copiedWebhookWoo ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                      <span>{copiedWebhookWoo ? "Copied" : "Copy"}</span>
-                    </button>
+              {showAdvanced && (
+                <CardContent className="pt-2 pb-4 px-4 space-y-4 text-xs border-t border-zinc-800/80 animate-in fade-in duration-200">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-semibold text-zinc-300">Shopify Abandoned Checkouts Webhook</span>
+                      <button
+                        onClick={() => handleCopy(shopifyWebhook, "shopify")}
+                        className="text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 text-[11px]"
+                      >
+                        {copiedWebhookShopify ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedWebhookShopify ? "Copied" : "Copy URL"}</span>
+                      </button>
+                    </div>
+                    <pre className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-400 font-mono text-[11px] overflow-x-auto">
+                      {shopifyWebhook}
+                    </pre>
                   </div>
-                  <pre className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-400 font-mono text-[11px] overflow-x-auto">
-                    {wooWebhook}
-                  </pre>
-                </div>
-              </CardContent>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-semibold text-zinc-300">WooCommerce Cart Webhook</span>
+                      <button
+                        onClick={() => handleCopy(wooWebhook, "woo")}
+                        className="text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1 text-[11px]"
+                      >
+                        {copiedWebhookWoo ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedWebhookWoo ? "Copied" : "Copy URL"}</span>
+                      </button>
+                    </div>
+                    <pre className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-400 font-mono text-[11px] overflow-x-auto">
+                      {wooWebhook}
+                    </pre>
+                  </div>
+                </CardContent>
+              )}
             </Card>
           </div>
 
@@ -287,23 +302,23 @@ export default function WidgetDashboardPage() {
               <span className="text-[11px] text-zinc-500 font-mono">Store: {activeStore?.name || "AutoCommerce"}</span>
             </div>
 
-            {/* Simulated Browser Frame */}
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-950 overflow-hidden shadow-2xl flex flex-col h-[640px]">
+            {/* Simulated Browser Frame with strictly fixed height */}
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-950 overflow-hidden shadow-2xl flex flex-col h-[580px]">
               {/* Browser Window Chrome */}
-              <div className="px-4 py-3 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between shrink-0">
+              <div className="px-4 py-2.5 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-red-500/80 inline-block" />
-                  <span className="w-3 h-3 rounded-full bg-amber-500/80 inline-block" />
-                  <span className="w-3 h-3 rounded-full bg-emerald-500/80 inline-block" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
                 </div>
-                <div className="px-4 py-1 rounded-lg bg-zinc-950 border border-zinc-800 text-[10px] text-zinc-400 font-mono truncate max-w-[220px]">
+                <div className="px-3 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[10px] text-zinc-400 font-mono truncate max-w-[220px]">
                   https://{activeStore?.name.toLowerCase().replace(/\s+/g, "") || "store"}.myshopify.com
                 </div>
-                <div className="w-8" />
+                <div className="w-6" />
               </div>
 
               {/* Interactive Store Preview Frame */}
-              <div className="flex-1 relative bg-zinc-950 overflow-y-auto p-4 flex flex-col justify-end">
+              <div className="flex-1 min-h-0 bg-zinc-950 p-2 sm:p-3 flex flex-col overflow-hidden">
                 <ChatWidget standalone={true} storeId={activeStoreId} themeColor={selectedColor} />
               </div>
             </div>
