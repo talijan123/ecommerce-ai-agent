@@ -4,7 +4,7 @@ Pydantic Schemas for Store Integrations (Shopify, WooCommerce, Custom API).
 
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ShopifyConnectRequest(BaseModel):
@@ -18,9 +18,22 @@ class ShopifyConnectRequest(BaseModel):
 
 class WooCommerceConnectRequest(BaseModel):
     store_id: str = Field(..., description="Target Store UUID")
-    shop_domain: str = Field(..., description="WooCommerce store URL, e.g. https://mystore.com")
+    shop_domain: Optional[str] = Field(None, description="WooCommerce store URL, e.g. https://mystore.com")
+    store_url: Optional[str] = Field(None, description="Alias for WooCommerce store URL")
     consumer_key: Optional[str] = Field(None, description="WooCommerce Consumer Key (ck_...)")
     consumer_secret: Optional[str] = Field(None, description="WooCommerce Consumer Secret (cs_...)")
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_store_url(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            url = data.get("store_url") or data.get("shop_domain")
+            if url:
+                data["shop_domain"] = url
+                data["store_url"] = url
+            elif "shop_domain" not in data and "store_url" not in data:
+                raise ValueError("WooCommerce store URL (shop_domain or store_url) is required.")
+        return data
 
 
 class SyncStoreRequest(BaseModel):

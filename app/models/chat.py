@@ -3,7 +3,7 @@ SQLAlchemy Model for Chat History and Conversation Context Persistence.
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, JSON, DateTime, ForeignKey, Uuid
+from sqlalchemy import Column, Integer, String, Text, Boolean, JSON, DateTime, ForeignKey, Uuid
 from app.core.database import Base
 
 
@@ -18,6 +18,7 @@ class ChatHistory(Base):
     tool_calls = Column(JSON, nullable=True)  # Assistant tool calls JSON if any
     tool_call_id = Column(String(100), nullable=True)  # Tool call id for tool role
     name = Column(String(100), nullable=True)  # Function name for tool role
+    needs_human = Column(Boolean, default=False, nullable=True)  # Escalation flag
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     def to_dict(self):
@@ -30,5 +31,7 @@ class ChatHistory(Base):
             "tool_calls": self.tool_calls,
             "tool_call_id": self.tool_call_id,
             "name": self.name,
+            "needs_human": bool(self.needs_human),
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+

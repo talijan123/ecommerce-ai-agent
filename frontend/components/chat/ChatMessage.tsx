@@ -196,6 +196,57 @@ export function ChatMessage({ message, onSelectAction }: ChatMessageProps) {
           </div>
         )}
 
+        {/* Product Cards for Inventory Tools */}
+        {message.tools_invoked &&
+          message.tools_invoked
+            .filter((t) => (t.tool_name === "check_product_inventory" || t.tool_name === "check_product_stock") && t.result && !t.result.error)
+            .map((t, tIdx) => {
+              const res = t.result;
+              const items = Array.isArray(res) ? res : res.products ? res.products : [res];
+              return (
+                <div key={tIdx} className="grid grid-cols-1 gap-2 pt-1">
+                  {items.slice(0, 2).map((item: any, iIdx: number) => {
+                    const title = item.name || item.title || "Product";
+                    const price = item.price ? `$${Number(item.price).toFixed(2)}` : null;
+                    const stock = item.stock_quantity ?? item.stock_count ?? item.stock ?? 0;
+                    const inStock = item.in_stock !== false && stock > 0;
+                    const img = item.image_url || item.thumbnail || (item.images && item.images[0]?.src);
+
+                    return (
+                      <div
+                        key={iIdx}
+                        className="flex items-center gap-3 p-2.5 rounded-xl border border-zinc-800 bg-zinc-900/90 shadow-md backdrop-blur-md"
+                      >
+                        {img ? (
+                          <img src={img} alt={title} className="w-12 h-12 rounded-lg object-cover bg-zinc-950 border border-zinc-800" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-indigo-950/50 border border-indigo-800/40 flex items-center justify-center text-indigo-400">
+                            <Package className="w-6 h-6" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs font-bold text-white truncate">{title}</h4>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {price && <span className="text-xs font-extrabold text-emerald-400">{price}</span>}
+                            <span className={cn("text-[10px] px-1.5 py-0.2 rounded font-medium", inStock ? "bg-emerald-950 text-emerald-300 border border-emerald-800" : "bg-red-950 text-red-300 border border-red-800")}>
+                              {inStock ? `In Stock (${stock})` : "Out of Stock"}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => onSelectAction ? onSelectAction(`I would like to order ${title}`) : null}
+                          className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-[11px] shrink-0 transition-all flex items-center gap-1 shadow-sm"
+                        >
+                          <span>Buy Now</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+
         {/* Text Message Bubble */}
         {message.content && (
           <div
@@ -209,6 +260,7 @@ export function ChatMessage({ message, onSelectAction }: ChatMessageProps) {
             {renderFormattedContent(message.content)}
           </div>
         )}
+
 
         {/* Timestamp */}
         {message.created_at && (

@@ -75,10 +75,15 @@ def track_order(
             "order_number": getattr(order, "order_number", clean_id),
             "status": getattr(order, "status", "Processing"),
             "tracking_number": getattr(order, "tracking_number", None),
+            "carrier": getattr(order, "carrier", None) or getattr(order, "courier", None),
             "courier": getattr(order, "carrier", None) or getattr(order, "courier", None),
+            "tracking_url": getattr(order, "tracking_url", None),
+            "customer_name": getattr(order, "customer_name", None),
+            "total_amount": getattr(order, "total_amount", 0.0),
             "created_at": order.created_at.isoformat() if getattr(order, "created_at", None) and hasattr(order.created_at, "isoformat") else str(getattr(order, "created_at", "")),
             "items": getattr(order, "items", []) or [],
         }
+
 
     except Exception as e:
         logger.error(f"❌ Error querying order '{order_id}' from database: {e}", exc_info=True)

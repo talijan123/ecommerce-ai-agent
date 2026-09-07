@@ -14,7 +14,10 @@ from app.services.cart_recovery import (
     process_abandoned_cart_recoveries,
     track_cart_engagement,
 )
+from app.services.cart_recovery_scheduler import CartRecoveryScheduler
 from app.services.ai_support_service import AISupportService, ai_support_service
+from app.services.shopify_service import ShopifySyncService
+from app.services.woocommerce_service import WooCommerceSyncService
 
 __all__ = [
     "OrderService",
@@ -25,11 +28,16 @@ __all__ = [
     "whatsapp_service",
     "CartRecoveryService",
     "cart_recovery_service",
+    "CartRecoveryScheduler",
     "dispatch_cart_recovery",
     "process_abandoned_cart_recoveries",
     "track_cart_engagement",
     "AISupportService",
     "ai_support_service",
+    "ShopifySyncService",
+    "WooCommerceSyncService",
 ]
+
+
 
 

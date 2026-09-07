@@ -15,6 +15,7 @@ class Order(Base):
     order_number = Column(String(50), unique=True, index=True, nullable=False)
     customer_name = Column(String(150), nullable=False)
     customer_email = Column(String(150), index=True, nullable=False)
+    customer_phone = Column(String(50), index=True, nullable=True)
     status = Column(String(50), index=True, nullable=False)  # "Shipped", "Processing", "Delivered", "Cancelled"
     carrier = Column(String(100), nullable=True)
     tracking_number = Column(String(100), nullable=True)
@@ -33,6 +34,7 @@ class Order(Base):
             "order_number": self.order_number,
             "customer_name": self.customer_name,
             "customer_email": self.customer_email,
+            "customer_phone": self.customer_phone,
             "status": self.status,
             "carrier": self.carrier,
             "tracking_number": self.tracking_number,
@@ -44,3 +46,4 @@ class Order(Base):
             "cancellation_reason": self.cancellation_reason,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+

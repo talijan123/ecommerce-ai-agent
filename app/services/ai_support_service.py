@@ -113,18 +113,22 @@ class AISupportService:
 
                 store_uuid = uuid.UUID(str(store_id)) if not isinstance(store_id, uuid.UUID) else store_id
                 prod_count = db.query(Product).filter(Product.store_id == store_uuid).count()
-                has_shopify = (
+                has_integration = (
                     db.query(StoreIntegration)
-                    .filter(StoreIntegration.store_id == store_uuid, StoreIntegration.platform == "shopify")
+                    .filter(
+                        StoreIntegration.store_id == store_uuid,
+                        StoreIntegration.platform.in_(["shopify", "woocommerce", "custom_api"]),
+                    )
                     .count()
                     > 0
                 )
 
-                if prod_count == 0 and not has_shopify:
+                if prod_count == 0 and not has_integration:
                     context_parts.append(
                         "Store Catalog Status: EMPTY (0 products currently in catalog). "
                         "If the customer asks for products or shopping recommendations, inform them politely that the catalog is currently being updated."
                     )
+
             except Exception as e:
                 logger.warning(f"Error inspecting store catalog in prompt builder: {e}")
 
@@ -181,7 +185,7 @@ class AISupportService:
         self,
         prompt: str,
         api_key: str,
-        model: str,
+        model: str = "gemini-2.5-flash",
         chat_history: Optional[List[Dict[str, Any]]] = None,
         system_instruction: Optional[str] = None,
         store_id: Optional[Any] = None,
@@ -518,14 +522,18 @@ class AISupportService:
             return self.fallback_reply
 
         # Auto-fetch multi-turn chat history if db and customer_phone are provided but history was not
-        if chat_history is None and customer_phone and db is not None:
+        if db is not None and customer_phone:
             try:
                 from app.services.chat_service import ChatService
                 cs = ChatService(db)
                 session_id = ChatService.build_session_id(customer_phone, store_id=store_id)
-                chat_history = cs.get_gemini_history(session_id, store_id=store_id, limit=10, max_inactivity_hours=4.0)
+                if ChatService.is_escalation_intent(customer_message):
+                    cs.mark_session_needs_human(session_id, store_id=store_id)
+                if chat_history is None:
+                    chat_history = cs.get_gemini_history(session_id, store_id=store_id, limit=10, max_inactivity_hours=4.0)
             except Exception as e:
                 logger.warning(f"Could not load chat history for {customer_phone}: {e}")
+
 
         prompt = self._build_contextual_prompt(
             customer_message=customer_message.strip(),

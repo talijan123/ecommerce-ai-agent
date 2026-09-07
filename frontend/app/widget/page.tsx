@@ -1,12 +1,26 @@
 "use client";
 
-import React from "react";
+import React, { Suspense } from "react";
 import Link from "next/link";
-import { ArrowLeft, Sparkles, Bot } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { ArrowLeft, Sparkles, Bot, X } from "lucide-react";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { Badge, Button } from "@/lib/ui";
 
-export default function StandaloneWidgetPage() {
+function WidgetContent() {
+  const searchParams = useSearchParams();
+  const storeId = searchParams.get("store_id") || undefined;
+  const embed = searchParams.get("embed") === "true";
+  const themeColor = searchParams.get("theme_color") || "#4f46e5";
+
+  if (embed) {
+    return (
+      <div className="h-screen w-screen bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden">
+        <ChatWidget standalone={true} embed={true} storeId={storeId} themeColor={themeColor} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col p-4 sm:p-10 bg-grid-pattern">
       {/* Top Bar */}
@@ -32,8 +46,17 @@ export default function StandaloneWidgetPage() {
           </p>
         </div>
 
-        <ChatWidget standalone={true} />
+        <ChatWidget standalone={true} storeId={storeId} themeColor={themeColor} />
       </div>
     </div>
   );
 }
+
+export default function StandaloneWidgetPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-400">Loading AI Assistant...</div>}>
+      <WidgetContent />
+    </Suspense>
+  );
+}
+

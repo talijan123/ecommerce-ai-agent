@@ -159,20 +159,18 @@ class EcommerceService:
             if shopify_res.get("success") or shopify_res.get("security_error"):
                 return shopify_res
 
-        # 2. Lookup from Database (Order table for tenant store_id)
-        db_res = self._lookup_db_order(cleaned_id, phone=phone, store_id=store_id, db=db)
-        if db_res.get("success") or db_res.get("security_error"):
-            return db_res
-
-        # 3. If store_id is provided, do NOT fall back to mock orders
+        # 2. If store_id is provided, lookup strictly from Database Order table
         if store_id is not None:
+            db_res = self._lookup_db_order(cleaned_id, phone=phone, store_id=store_id, db=db)
+            if db_res.get("success") or db_res.get("security_error"):
+                return db_res
             return {
                 "success": False,
                 "error": f"Order #{cleaned_id} was not found in the store records.",
                 "suggested_action": "Please verify your order number.",
             }
 
-        # 4. Fallback to mock data store only in standalone local PoC mode without store_id
+        # 3. Fallback to mock data store in standalone local PoC mode without store_id
         return self._lookup_mock_order(cleaned_id, phone=phone)
 
     def _lookup_db_order(

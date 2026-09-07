@@ -25,10 +25,19 @@ import { cn } from "@/lib/utils";
 interface ChatWidgetProps {
   initialOpen?: boolean;
   standalone?: boolean;
+  embed?: boolean;
+  storeId?: string;
+  themeColor?: string;
 }
 
-export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidgetProps) {
-  const [isOpen, setIsOpen] = useState(initialOpen || standalone);
+export function ChatWidget({
+  initialOpen = false,
+  standalone = false,
+  embed = false,
+  storeId,
+  themeColor,
+}: ChatWidgetProps) {
+  const [isOpen, setIsOpen] = useState(initialOpen || standalone || embed);
   const [isExpanded, setIsExpanded] = useState(false);
   const [sessionId, setSessionId] = useState<string>("");
   const [inputMessage, setInputMessage] = useState("");
@@ -36,18 +45,20 @@ export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidg
   const [isLoading, setIsLoading] = useState(false);
   const [customerEmail, setCustomerEmail] = useState("");
   const [showEmailInput, setShowEmailInput] = useState(false);
-  const [showWelcomeToast, setShowWelcomeToast] = useState(true);
+  const [showWelcomeToast, setShowWelcomeToast] = useState(!embed && !standalone);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Initialize or restore session ID from localStorage
   useEffect(() => {
-    let currentSession = localStorage.getItem("autocommerce_chat_session_id");
+    const storageKey = storeId ? `autocommerce_chat_session_${storeId}` : "autocommerce_chat_session_id";
+    let currentSession = localStorage.getItem(storageKey);
     if (!currentSession) {
       currentSession = "sess_" + Math.random().toString(36).substring(2, 10);
-      localStorage.setItem("autocommerce_chat_session_id", currentSession);
+      localStorage.setItem(storageKey, currentSession);
     }
     setSessionId(currentSession);
+
 
     // Initial greeting
     setMessages([
@@ -108,9 +119,10 @@ export function ChatWidget({ initialOpen = false, standalone = false }: ChatWidg
     setIsLoading(true);
 
     try {
-      const response = await api.sendChatMessage(sessionId, query, customerEmail || undefined);
+      const response = await api.sendChatMessage(sessionId, query, customerEmail || undefined, storeId);
 
       const assistantMsg: MessageItem = {
+
         role: "assistant",
         content: response.response,
         tools_invoked: response.tools_invoked,

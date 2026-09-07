@@ -141,6 +141,47 @@ class ChatService:
         except Exception:
             return []
 
+    @staticmethod
+    def is_escalation_intent(text: Optional[str]) -> bool:
+        """Check if message indicates intent to speak with a human agent or request a refund."""
+        if not text:
+            return False
+        keywords = [
+            "human",
+            "agent",
+            "representative",
+            "operator",
+            "speak to someone",
+            "talk to a person",
+            "talk to human",
+            "talk to agent",
+            "refund",
+            "complaint",
+            "scam",
+            "fraud",
+            "manager",
+        ]
+        text_lower = text.lower()
+        return any(kw in text_lower for kw in keywords)
+
+    def mark_session_needs_human(self, session_id: str, store_id: Optional[Any] = None) -> bool:
+        """Flag all messages in the session as needing human review."""
+        try:
+            query = self.db.query(ChatHistory).filter(ChatHistory.session_id == session_id)
+            if store_id is not None:
+                query = query.filter(ChatHistory.store_id == store_id)
+            records = query.all()
+            for r in records:
+                r.needs_human = True
+            self.db.commit()
+            return True
+        except Exception:
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
+            return False
+
     def add_message(
         self,
         session_id: str,
@@ -150,11 +191,13 @@ class ChatService:
         tool_call_id: Optional[str] = None,
         name: Optional[str] = None,
         store_id: Optional[Any] = None,
+        needs_human: Optional[bool] = None,
     ) -> Optional[ChatHistory]:
         """
         Store a message or tool execution step in the database with timestamps and tenant store_id.
         """
         try:
+            flag = needs_human if needs_human is not None else self.is_escalation_intent(content)
             record = ChatHistory(
                 store_id=store_id,
                 session_id=session_id,
@@ -163,6 +206,7 @@ class ChatService:
                 tool_calls=tool_calls,
                 tool_call_id=tool_call_id,
                 name=name,
+                needs_human=flag,
                 created_at=datetime.now(timezone.utc),
             )
             self.db.add(record)
@@ -175,3 +219,4 @@ class ChatService:
             except Exception:
                 pass
             return None
+

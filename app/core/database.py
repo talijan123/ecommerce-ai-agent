@@ -106,7 +106,6 @@ def create_db_and_tables():
     # Automatic schema migration for new columns in PostgreSQL
     try:
         with engine.begin() as conn:
-            if not db_url.startswith("sqlite"):
                 conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS customer_name VARCHAR(150) DEFAULT 'Valued Customer'"))
                 conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(50)"))
                 conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS recovery_sent BOOLEAN DEFAULT FALSE"))
@@ -115,16 +114,20 @@ def create_db_and_tables():
                 conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'pending'"))
                 conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS customer_response_at TIMESTAMP"))
                 conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS last_customer_message TEXT"))
+                conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS checkout_url VARCHAR(500)"))
+                conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS abandoned_at TIMESTAMP"))
                 # Multi-tenancy store_id column migrations
                 conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'merchant'"))
                 conn.execute(text("ALTER TABLE stores ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES users(id)"))
                 conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id)"))
+                conn.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(50)"))
                 conn.execute(text("ALTER TABLE products ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id)"))
                 conn.execute(text("ALTER TABLE chat_histories ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id)"))
+                conn.execute(text("ALTER TABLE chat_histories ADD COLUMN IF NOT EXISTS needs_human BOOLEAN DEFAULT FALSE"))
                 conn.execute(text("ALTER TABLE cart_sessions ADD COLUMN IF NOT EXISTS store_id UUID REFERENCES stores(id)"))
     except Exception as e:
-        # Pass gracefully if already migrated
-        pass
+        print(f"[WARN] Schema migration error: {e}")
+
 
 
 _db_initialized = False

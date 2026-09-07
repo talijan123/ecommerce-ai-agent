@@ -26,6 +26,7 @@ from app.schemas.integration import (
 )
 
 from app.services.shopify_service import ShopifySyncService
+from app.services.woocommerce_service import WooCommerceSyncService
 
 router = APIRouter()
 
@@ -280,10 +281,33 @@ def connect_woocommerce(
 ):
     """
     Connect a merchant's WooCommerce store with REST credentials.
+    - Normalizes store URL
+    - Verifies credentials against WooCommerce REST API (/wp-json/wc/v3/system_status)
+    - Saves or updates StoreIntegration record
+    - Triggers immediate product catalog ingestion
     """
     store = _get_user_store(payload.store_id, db, current_user)
-    clean_url = payload.shop_domain.strip().rstrip("/")
+    raw_url = payload.store_url or payload.shop_domain or ""
+    clean_url = WooCommerceSyncService.clean_store_url(raw_url)
 
+    if not clean_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid WooCommerce store URL. Please provide a valid URL (e.g. https://mystore.com).",
+        )
+
+    # 1. Verify credentials if consumer_key and consumer_secret are provided
+    if payload.consumer_key and payload.consumer_secret:
+        is_valid, err_msg = WooCommerceSyncService.verify_credentials(
+            clean_url, payload.consumer_key, payload.consumer_secret
+        )
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to authenticate with WooCommerce store '{clean_url}': {err_msg}",
+            )
+
+    # 2. Save or update StoreIntegration record
     integration = (
         db.query(StoreIntegration)
         .filter(
@@ -315,6 +339,20 @@ def connect_woocommerce(
 
     db.commit()
     db.refresh(integration)
+
+    # 3. Immediately ingest products
+    try:
+        WooCommerceSyncService.fetch_and_ingest_products(
+            db=db,
+            store_id=str(store.id),
+            store_url=clean_url,
+            consumer_key=payload.consumer_key,
+            consumer_secret=payload.consumer_secret,
+        )
+        db.refresh(integration)
+    except Exception as e:
+        print(f"[ERROR] WooCommerce auto-sync failed during connect: {e}")
+
     return integration.to_dict()
 
 
@@ -329,7 +367,10 @@ def sync_woocommerce_catalog(
     db: Session = Depends(get_db),
 ):
     """
-    Sync catalog products from WooCommerce store.
+    Sync catalog products from WooCommerce store:
+    - Fetches live products from WooCommerce REST API (/wp-json/wc/v3/products)
+    - Ingests & upserts items into database with SKUs, variant breakdowns, categories, and prices
+    - Updates StoreIntegration record with synced item count and timestamp
     """
     store = _get_user_store(payload.store_id, db, current_user)
 
@@ -342,57 +383,20 @@ def sync_woocommerce_catalog(
         .first()
     )
 
-    if not integration:
-        integration = StoreIntegration(
-            store_id=store.id,
-            platform="woocommerce",
-            shop_domain=f"https://{store.name.lower().replace(' ', '')}-store.com",
-            sync_status="syncing",
-            products_synced_count=0,
-        )
-        db.add(integration)
+    store_url = integration.shop_domain if integration and integration.shop_domain else f"https://{store.name.lower().replace(' ', '')}-store.com"
+    consumer_key = integration.api_key if integration else None
+    consumer_secret = integration.access_token if integration else None
 
-    integration.sync_status = "syncing"
-    db.commit()
+    result = WooCommerceSyncService.fetch_and_ingest_products(
+        db=db,
+        store_id=str(store.id),
+        store_url=store_url,
+        consumer_key=consumer_key,
+        consumer_secret=consumer_secret,
+    )
 
-    # Ingest starter WooCommerce items
-    synced_items = []
-    for item in SAMPLE_SHOPIFY_CATALOG[:3]:
-        unique_sku = f"WC-{item['sku']}-{str(store.id)[:4].upper()}"
-        existing = db.query(Product).filter(Product.sku == unique_sku).first()
-        if not existing:
-            product = Product(
-                store_id=store.id,
-                sku=unique_sku,
-                title=f"[WC] {item['title']}",
-                category=item["category"],
-                price=item["price"],
-                stock_quantity=item["stock"],
-                description=item["description"],
-                size_variants=item["sizes"],
-                rating=4.7,
-            )
-            db.add(product)
-            synced_items.append(product)
+    return result
 
-    db.commit()
-
-    total_store_prods = db.query(Product).filter(Product.store_id == store.id).count()
-    integration.sync_status = "synced"
-    integration.products_synced_count = total_store_prods
-    integration.last_synced_at = datetime.now(timezone.utc)
-    integration.updated_at = datetime.now(timezone.utc)
-    db.commit()
-
-    return {
-        "success": True,
-        "platform": "woocommerce",
-        "store_id": str(store.id),
-        "products_synced": len(synced_items),
-        "sync_status": "synced",
-        "message": f"Successfully synchronized {len(synced_items)} products from WooCommerce into '{store.name}' catalog.",
-        "sample_products": [p.to_dict() for p in synced_items[:3]],
-    }
 
 
 @router.get(

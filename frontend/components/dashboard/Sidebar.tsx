@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   CheckCircle,
   X,
+  Code,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -40,11 +41,18 @@ const NAV_ITEMS = [
     badge: "Agent",
   },
   {
+    title: "Live Chat Widget",
+    href: "/dashboard/widget",
+    icon: Code,
+    badge: "Embed",
+  },
+  {
     title: "AI Chat Logs & Tools",
     href: "/dashboard/conversations",
     icon: MessageSquare,
   },
 ];
+
 
 interface SidebarInnerProps {
   onNavClick?: () => void;
