@@ -34,6 +34,22 @@ class CartSession(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=True)
 
+    @property
+    def total_price(self) -> float:
+        """Calculate total price of abandoned cart items."""
+        if not self.abandoned_items or not isinstance(self.abandoned_items, list):
+            return 0.0
+        total = 0.0
+        for item in self.abandoned_items:
+            if isinstance(item, dict):
+                try:
+                    price = float(item.get("price") or item.get("unit_price") or 0.0)
+                    qty = int(item.get("quantity") or item.get("qty") or 1)
+                    total += price * qty
+                except (ValueError, TypeError):
+                    continue
+        return round(total, 2)
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -43,6 +59,7 @@ class CartSession(Base):
             "customer_name": self.customer_name or "Valued Customer",
             "customer_phone": self.customer_phone,
             "abandoned_items": self.abandoned_items,
+            "total_price": self.total_price,
             "discount_eligible": self.discount_eligible,
             "discount_code": self.discount_code,
             "discount_percentage": self.discount_percentage,

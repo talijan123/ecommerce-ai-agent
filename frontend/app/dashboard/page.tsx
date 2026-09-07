@@ -51,6 +51,7 @@ import {
   StoreResponse,
   Product,
   DashboardStats,
+  EnterpriseRoiMetrics,
   Order,
   getSandboxConnectUrl,
   DEFAULT_WHATSAPP_CLEAN_PHONE,
@@ -67,9 +68,12 @@ export default function DashboardOverviewPage() {
   const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [roiMetrics, setRoiMetrics] = useState<EnterpriseRoiMetrics | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [catalogLoading, setCatalogLoading] = useState(false);
+  const [triggeringRecovery, setTriggeringRecovery] = useState(false);
+  const [recoverySuccessMsg, setRecoverySuccessMsg] = useState<string | null>(null);
 
   // Modals State
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
@@ -109,17 +113,20 @@ export default function DashboardOverviewPage() {
       if (storesData.length > 0) {
         const selectedId = activeStoreId || storesData[0].id;
         setActiveStoreId(selectedId);
-        const [statsData, ordersData] = await Promise.all([
+        const [statsData, ordersData, roiData] = await Promise.all([
           api.getDashboardStats(selectedId).catch(() => null),
           api.getOrders(selectedId).catch(() => []),
+          api.getEnterpriseRoiMetrics(selectedId).catch(() => null),
         ]);
         setStats(statsData);
         setOrders(ordersData);
+        setRoiMetrics(roiData);
         loadStoreCatalog(selectedId);
       } else {
         setStats(null);
         setOrders([]);
         setProducts([]);
+        setRoiMetrics(null);
         // No stores found -> automatically open onboarding wizard
         setIsOnboardingOpen(true);
       }
@@ -140,14 +147,34 @@ export default function DashboardOverviewPage() {
     setActiveStoreId(storeId);
     loadStoreCatalog(storeId);
     try {
-      const [statsData, ordersData] = await Promise.all([
+      const [statsData, ordersData, roiData] = await Promise.all([
         api.getDashboardStats(storeId).catch(() => null),
         api.getOrders(storeId).catch(() => []),
+        api.getEnterpriseRoiMetrics(storeId).catch(() => null),
       ]);
       setStats(statsData);
       setOrders(ordersData);
+      setRoiMetrics(roiData);
     } catch (err) {
       console.error("Error loading store metrics:", err);
+    }
+  };
+
+  const handleTriggerRecovery = async () => {
+    try {
+      setTriggeringRecovery(true);
+      setRecoverySuccessMsg(null);
+      await api.triggerWhatsAppCartRecovery(undefined, true);
+      setRecoverySuccessMsg("WhatsApp cart recovery sequence triggered successfully!");
+      if (activeStoreId) {
+        const updatedRoi = await api.getEnterpriseRoiMetrics(activeStoreId).catch(() => null);
+        setRoiMetrics(updatedRoi);
+      }
+      setTimeout(() => setRecoverySuccessMsg(null), 4000);
+    } catch (err: any) {
+      console.error("Failed to trigger recovery:", err);
+    } finally {
+      setTriggeringRecovery(false);
     }
   };
 
@@ -272,36 +299,260 @@ export default function DashboardOverviewPage() {
           </div>
         </div>
 
-        {/* 4-Card Responsive KPI Metrics Grid */}
+        {/* 4-Card Responsive Enterprise ROI KPI Metrics Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricsCard
-            title="Total Catalog Products"
-            value={totalProductsCount.toString()}
-            icon={Package}
-            trend={{ value: `${totalProductsCount} in database`, isPositive: true }}
-            accentColor="blue"
-          />
-          <MetricsCard
-            title="Active WhatsApp Sessions"
-            value={activeSessionsCount.toString()}
-            icon={MessageSquare}
-            trend={{ value: "Multi-turn sandbox", isPositive: true }}
+            title="Recovered Revenue"
+            value={roiMetrics ? roiMetrics.recovered_revenue_formatted : "$0.00"}
+            icon={DollarSign}
+            trend={{
+              value: `${roiMetrics?.recovered_carts_count || 0} carts recovered`,
+              isPositive: (roiMetrics?.recovered_carts_count || 0) > 0,
+            }}
+            description="Sum of recovered WhatsApp cart orders"
             accentColor="emerald"
           />
           <MetricsCard
-            title="Customer Inquiries"
-            value={stats?.total_messages?.toString() || "0"}
-            icon={Bot}
-            trend={{ value: "Autonomous AI replies", isPositive: true }}
+            title="Abandoned Carts Recovered"
+            value={`${roiMetrics?.recovered_carts_count || 0} / ${roiMetrics?.total_abandoned_carts || 0}`}
+            icon={ShoppingCart}
+            trend={{
+              value: `${roiMetrics?.recovery_rate_pct || 0}% recovery rate`,
+              isPositive: (roiMetrics?.recovery_rate_pct || 0) > 0,
+            }}
+            description="Autonomous follow-up sequences"
+            accentColor="blue"
+          />
+          <MetricsCard
+            title="AI Support Resolution Rate"
+            value={`${roiMetrics?.ai_resolution_rate_pct ?? 100}%`}
+            icon={Zap}
+            trend={{
+              value: `${roiMetrics?.auto_resolved_conversations || 0} of ${roiMetrics?.total_conversations || 0} automated`,
+              isPositive: true,
+            }}
+            description={`${roiMetrics?.escalated_conversations || 0} escalated to human team`}
             accentColor="indigo"
           />
           <MetricsCard
-            title="Low Stock & Variant Alerts"
-            value={lowStockCount.toString()}
-            icon={AlertTriangle}
-            trend={{ value: lowStockCount === 0 ? "Inventory healthy" : "Restock recommended", isPositive: lowStockCount === 0 }}
-            accentColor="amber"
+            title="Support Hours Saved"
+            value={`${roiMetrics?.support_hours_saved || 0} hrs`}
+            icon={ShieldCheck}
+            trend={{
+              value: `~$${roiMetrics?.support_cost_saved || 0} labor saved`,
+              isPositive: true,
+            }}
+            description="@ $15/hr (8 min/inquiry benchmark)"
+            accentColor="purple"
           />
+        </div>
+
+        {/* Enterprise ROI Visual Section: Weekly Recovered Sales Chart & Live Recovery Stream */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left: Weekly Sales Recovered Trend Chart (7 Cols) */}
+          <Card className="lg:col-span-7 p-5 sm:p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/60 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-zinc-100 dark:border-zinc-800">
+                <div>
+                  <div className="flex items-center gap-2 font-bold text-sm sm:text-base text-zinc-900 dark:text-white">
+                    <TrendingUp className="h-5 w-5 text-emerald-500" />
+                    <span>Weekly Recovered Sales Trend</span>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Recovered revenue over the last 7 days via automated WhatsApp cart recovery
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Badge variant="success" className="font-mono text-xs px-2.5 py-1">
+                    7-Day Total: {roiMetrics?.recovered_revenue_formatted || "$0.00"}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Visual Interactive Bar Chart */}
+              <div className="pt-6 pb-2">
+                {(() => {
+                  const trend = roiMetrics?.weekly_revenue_trend || [];
+                  const maxVal = Math.max(...trend.map((t) => t.recovered_amount), 100);
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="h-44 sm:h-48 flex items-end justify-between gap-2 sm:gap-4 pt-6 px-2">
+                        {trend.map((point, idx) => {
+                          const heightPct = Math.max((point.recovered_amount / maxVal) * 100, 6);
+                          const isHigh = point.recovered_amount > 0;
+
+                          return (
+                            <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group relative">
+                              {/* Amount Tooltip on hover */}
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-9 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg pointer-events-none whitespace-nowrap z-20">
+                                ${point.recovered_amount.toFixed(2)} ({point.carts_count} {point.carts_count === 1 ? "cart" : "carts"})
+                              </div>
+
+                              {/* Amount Label above bar (if > 0) */}
+                              <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 font-bold truncate max-w-full">
+                                {point.recovered_amount > 0 ? `$${point.recovered_amount.toFixed(0)}` : "$0"}
+                              </span>
+
+                              {/* The Bar Track and Fill */}
+                              <div className="w-full max-w-[44px] h-32 bg-zinc-100 dark:bg-zinc-800/80 rounded-xl overflow-hidden flex flex-col justify-end p-0.5 relative group-hover:ring-2 group-hover:ring-emerald-500/30 transition-all">
+                                <div
+                                  style={{ height: `${heightPct}%` }}
+                                  className={`w-full rounded-lg transition-all duration-500 ${
+                                    isHigh
+                                      ? "bg-gradient-to-t from-emerald-600 to-teal-400 shadow-sm shadow-emerald-500/20"
+                                      : "bg-zinc-300 dark:bg-zinc-700/60"
+                                  }`}
+                                />
+                              </div>
+
+                              {/* Date Label */}
+                              <span className="text-[10px] sm:text-[11px] font-medium text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
+                                {point.label}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Bottom Chart Highlights */}
+            <div className="pt-4 mt-2 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+              <div className="bg-zinc-50 dark:bg-zinc-800/40 p-2.5 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold block">Avg Recovery Value</span>
+                <span className="font-bold text-zinc-900 dark:text-white mt-0.5 block">
+                  {roiMetrics && roiMetrics.recovered_carts_count > 0
+                    ? `$${(roiMetrics.recovered_revenue / roiMetrics.recovered_carts_count).toFixed(2)} / cart`
+                    : "$0.00"}
+                </span>
+              </div>
+              <div className="bg-zinc-50 dark:bg-zinc-800/40 p-2.5 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold block">Active Incentive</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">
+                  10% Dynamic Discount
+                </span>
+              </div>
+              <div className="bg-zinc-50 dark:bg-zinc-800/40 p-2.5 rounded-xl border border-zinc-100 dark:border-zinc-800 col-span-2 sm:col-span-1">
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold block">Engine Status</span>
+                <span className="font-bold text-blue-600 dark:text-blue-400 mt-0.5 flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                  Auto-Dispatched 24/7
+                </span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Right: Live Recovery Stream (5 Cols) */}
+          <Card className="lg:col-span-5 p-5 sm:p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-900/60 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between gap-2 pb-4 border-b border-zinc-100 dark:border-zinc-800">
+                <div>
+                  <div className="flex items-center gap-2 font-bold text-sm sm:text-base text-zinc-900 dark:text-white">
+                    <Activity className="h-5 w-5 text-blue-500" />
+                    <span>Live Cart Recovery Stream</span>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    WhatsApp recovery sequences & customer conversion status
+                  </p>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTriggerRecovery}
+                  disabled={triggeringRecovery}
+                  className="gap-1.5 text-xs text-blue-700 dark:text-blue-400 bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20 shrink-0"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${triggeringRecovery ? "animate-spin" : ""}`} />
+                  <span>{triggeringRecovery ? "Sending..." : "Trigger Recovery"}</span>
+                </Button>
+              </div>
+
+              {recoverySuccessMsg && (
+                <div className="mt-3 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>{recoverySuccessMsg}</span>
+                </div>
+              )}
+
+              {/* Recovery Feed List */}
+              <div className="mt-4 space-y-2.5 max-h-[290px] overflow-y-auto custom-scrollbar pr-1">
+                {(!roiMetrics?.recent_recoveries || roiMetrics.recent_recoveries.length === 0) ? (
+                  <div className="p-8 text-center text-zinc-400 text-xs space-y-2">
+                    <ShoppingCart className="h-8 w-8 mx-auto text-zinc-300 dark:text-zinc-600 opacity-60" />
+                    <p className="font-medium">No abandoned cart sessions yet</p>
+                    <p className="text-[11px] text-zinc-500 max-w-xs mx-auto">
+                      Abandoned carts captured from webhooks or storefront will appear here with automated WhatsApp recovery tracking.
+                    </p>
+                  </div>
+                ) : (
+                  roiMetrics.recent_recoveries.slice(0, 6).map((item) => {
+                    const isRecovered = item.is_recovered || item.status.toLowerCase() === "recovered";
+                    const isDispatched = item.status.toLowerCase() === "dispatched";
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-100 dark:border-zinc-800 hover:border-zinc-200 dark:hover:border-zinc-700 transition-colors flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs text-zinc-900 dark:text-white truncate">
+                              {item.customer_name}
+                            </span>
+                            {item.discount_code && item.discount_code !== "None" && (
+                              <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold border border-blue-500/20">
+                                {item.discount_code}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5">
+                            {item.product_summary}
+                          </p>
+                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">
+                            {item.customer_phone !== "N/A" ? item.customer_phone : item.customer_email}
+                          </span>
+                        </div>
+
+                        <div className="text-right shrink-0 space-y-1">
+                          <div className="font-black text-xs text-zinc-900 dark:text-white">
+                            ${item.cart_value.toFixed(2)}
+                          </div>
+                          <div>
+                            {isRecovered ? (
+                              <Badge variant="success" dot={true} className="text-[9px] py-0 px-1.5">
+                                Recovered
+                              </Badge>
+                            ) : isDispatched ? (
+                              <Badge variant="default" dot={true} className="text-[9px] py-0 px-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">
+                                Dispatched
+                              </Badge>
+                            ) : (
+                              <Badge variant="warning" dot={true} className="text-[9px] py-0 px-1.5">
+                                Pending
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <div className="pt-3 mt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500">
+              <span>Total Tracked Sessions: {roiMetrics?.total_abandoned_carts || 0}</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                {roiMetrics?.recovery_rate_pct || 0}% Converted
+              </span>
+            </div>
+          </Card>
         </div>
 
         {/* Catalog Section: Empty State OR Live Product Table */}

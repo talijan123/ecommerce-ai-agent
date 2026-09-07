@@ -301,6 +301,44 @@ export interface DashboardStats {
   error?: string;
 }
 
+export interface WeeklyRevenuePoint {
+  date: string;
+  label: string;
+  recovered_amount: number;
+  carts_count: number;
+}
+
+export interface RecentRecoveryItem {
+  id: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_email: string;
+  product_summary: string;
+  cart_value: number;
+  discount_code: string;
+  discount_percentage: number;
+  status: string;
+  is_recovered: boolean;
+  timestamp?: string | null;
+}
+
+export interface EnterpriseRoiMetrics {
+  recovered_revenue: number;
+  recovered_revenue_formatted: string;
+  currency: string;
+  total_abandoned_carts: number;
+  recovered_carts_count: number;
+  recovery_rate_pct: number;
+  total_conversations: number;
+  auto_resolved_conversations: number;
+  escalated_conversations: number;
+  ai_resolution_rate_pct: number;
+  support_hours_saved: number;
+  support_cost_saved: number;
+  weekly_revenue_trend: WeeklyRevenuePoint[];
+  recent_recoveries: RecentRecoveryItem[];
+}
+
 export interface ConversationSummary {
   session_id: string;
   channel: string;
@@ -547,6 +585,13 @@ export const api = {
   // ----------------------------------------
   // Admin & Stats APIs
   // ----------------------------------------
+  async getEnterpriseRoiMetrics(storeId?: string): Promise<EnterpriseRoiMetrics> {
+    const res = await apiClient.get<EnterpriseRoiMetrics>("/api/v1/analytics/dashboard-metrics", {
+      params: storeId ? { store_id: storeId } : undefined,
+    });
+    return res.data;
+  },
+
   async getDashboardStats(storeId?: string): Promise<DashboardStats> {
     const res = await apiClient.get<DashboardStats>("/api/v1/admin/stats", {
       params: storeId ? { store_id: storeId } : undefined,

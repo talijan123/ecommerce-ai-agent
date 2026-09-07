@@ -92,8 +92,50 @@ export function ChatWidget({
     };
 
     window.addEventListener("open-ai-chat" as any, handleOpenChatEvent as EventListener);
+
+    // Listen for iframe postMessage from parent storefront (proactive nudge engine)
+    const handlePostMessage = (event: MessageEvent) => {
+      try {
+        const data = event.data;
+        if (!data || typeof data !== "object") return;
+
+        if (data.type === "autocommerce:proactive_greet" || data.action === "proactive_greet") {
+          setIsOpen(true);
+          setShowWelcomeToast(false);
+          const productTitle = data.productTitle || "";
+          const greetingText = productTitle
+            ? `Hi there! 👋 I noticed you're browsing **${productTitle}**.\n\nWould you like help with choosing the right size, checking delivery to your address, or current stock availability? Ask me anything!`
+            : data.prompt
+            ? `Hi! 👋 ${data.prompt}`
+            : "Hi there! 👋 How can I help you find the perfect item or answer questions about your order today?";
+
+          setMessages((prev) => {
+            // Avoid adding greeting twice if already present
+            if (prev.some((m) => m.content === greetingText)) return prev;
+            return [
+              ...prev,
+              {
+                role: "assistant",
+                content: greetingText,
+                created_at: new Date().toISOString(),
+              },
+            ];
+          });
+
+          setTimeout(() => {
+            inputRef.current?.focus();
+          }, 250);
+        }
+      } catch (err) {
+        console.error("Error processing postMessage:", err);
+      }
+    };
+
+    window.addEventListener("message", handlePostMessage);
+
     return () => {
       window.removeEventListener("open-ai-chat" as any, handleOpenChatEvent as EventListener);
+      window.removeEventListener("message", handlePostMessage);
     };
   }, [sessionId, customerEmail, isLoading]);
 
