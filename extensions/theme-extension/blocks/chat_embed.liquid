@@ -1,0 +1,54 @@
+{% comment %}
+  AutoCommerce AI Autonomous Storefront Assistant Theme App Embed Block
+  Embeds the real-time AI sales agent, catalog search, order tracking, and abandoned cart recovery.
+{% endcomment %}
+
+{% assign current_store_id = block.settings.store_id %}
+{% if current_store_id == blank and app.metafields.autocommerce.store_id != blank %}
+  {% assign current_store_id = app.metafields.autocommerce.store_id %}
+{% endif %}
+
+<script
+  src="https://ecommerce-store-frontend-swart.vercel.app/widget.js"
+  data-store-id="{{ current_store_id }}"
+  data-theme-color="{{ block.settings.theme_color | default: '#4f46e5' }}"
+  data-position="{{ block.settings.position | default: 'right' }}"
+  defer
+></script>
+
+{% schema %}
+{
+  "name": "AutoCommerce AI Chat",
+  "target": "body",
+  "settings": [
+    {
+      "type": "text",
+      "id": "store_id",
+      "label": "AutoCommerce Store ID",
+      "info": "Your unique AutoCommerce merchant store tenant UUID"
+    },
+    {
+      "type": "color",
+      "id": "theme_color",
+      "label": "Widget Brand Accent Color",
+      "default": "#4f46e5"
+    },
+    {
+      "type": "select",
+      "id": "position",
+      "label": "Widget Dock Position",
+      "options": [
+        {
+          "value": "right",
+          "label": "Bottom Right"
+        },
+        {
+          "value": "left",
+          "label": "Bottom Left"
+        }
+      ],
+      "default": "right"
+    }
+  ]
+}
+{% endschema %}

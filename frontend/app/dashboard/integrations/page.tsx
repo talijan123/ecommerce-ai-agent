@@ -482,6 +482,36 @@ export default function IntegrationsPage() {
               </div>
             </div>
 
+            {/* 1-Click Theme App Embed Activation (when connected) */}
+            {isShopifyConnected && (
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-emerald-500" />
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white">
+                      Shopify Theme App Embed
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                    Zero-Code
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  Opens your Shopify theme editor with the AI Assistant app embed ready to toggle on.
+                </p>
+                <a
+                  href={`https://${(shopifyIntegration?.shop_domain || activeStore?.name || "my-brand.myshopify.com").replace(/^https?:\/\//i, "").replace(/\/+$/, "")}/admin/themes/current/editor?context=apps`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                >
+                  <ShoppingBag className="h-4 w-4" />
+                  <span>Activate Widget in 1-Click</span>
+                  <ExternalLink className="h-3.5 w-3.5 ml-0.5 opacity-80" />
+                </a>
+              </div>
+            )}
+
             {/* Actions Bar */}
             <div className="flex items-center gap-3 pt-1">
               {isShopifyConnected ? (

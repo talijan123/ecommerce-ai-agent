@@ -19,6 +19,7 @@ import {
   Terminal,
   Zap,
   ChevronDown,
+  ShoppingBag,
 } from "lucide-react";
 import { Header } from "@/components/dashboard/Header";
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge } from "@/lib/ui";
@@ -140,6 +141,40 @@ export default function WidgetDashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Column: Embed Code & Customizer (7 cols) */}
           <div className="lg:col-span-7 space-y-6">
+            {/* 1-Click Shopify Theme App Embed Card */}
+            <Card className="border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-zinc-900/60 to-zinc-900/90 shadow-xl overflow-hidden">
+              <CardHeader className="border-b border-zinc-800/80 pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <ShoppingBag className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-base text-white">Shopify 1-Click Theme Embed</CardTitle>
+                        <Badge variant="emerald" className="text-[10px] uppercase font-bold py-0.5">
+                          Zero-Code
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-zinc-400">
+                        Opens your Shopify theme editor with the AI Assistant app embed ready to toggle on.
+                      </p>
+                    </div>
+                  </div>
+                  <a
+                    href={`https://${(activeStore?.name || "my-brand").toLowerCase().replace(/[^a-z0-9]/g, "")}.myshopify.com/admin/themes/current/editor?context=apps`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all shrink-0 hover:scale-105 active:scale-95"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>Activate in 1-Click</span>
+                    <ExternalLink className="w-3 h-3 opacity-80" />
+                  </a>
+                </div>
+              </CardHeader>
+            </Card>
+
             {/* 1-Line Embed Code Card */}
             <Card className="border-indigo-500/30 bg-gradient-to-br from-indigo-950/20 via-zinc-900/60 to-zinc-900/90 shadow-xl overflow-hidden">
               <CardHeader className="border-b border-zinc-800/80 pb-4">
@@ -149,8 +184,8 @@ export default function WidgetDashboardPage() {
                       <Code className="w-5 h-5" />
                     </div>
                     <div>
-                      <CardTitle className="text-base text-white">Embed Script Tag</CardTitle>
-                      <p className="text-xs text-zinc-400">Paste before the closing &lt;/body&gt; tag of your website.</p>
+                      <CardTitle className="text-base text-white">Generic HTML / JavaScript Script Tag</CardTitle>
+                      <p className="text-xs text-zinc-400">Paste before the closing &lt;/body&gt; tag on WooCommerce, Webflow, or custom HTML stores.</p>
                     </div>
                   </div>
                   <Button
