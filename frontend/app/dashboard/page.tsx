@@ -56,7 +56,7 @@ import {
   getSandboxConnectUrl,
   DEFAULT_WHATSAPP_CLEAN_PHONE,
 } from "@/lib/api";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, getCurrencySymbol } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { getProductImage } from "@/lib/productImages";
 
@@ -208,6 +208,9 @@ export default function DashboardOverviewPage() {
     (p) => p.stock_quantity <= 5 || (p.size_variants || []).some((v) => v.stock === 0)
   ).length;
 
+  const currency = roiMetrics?.currency || "USD";
+  const currencySymbol = roiMetrics?.currency_symbol || getCurrencySymbol(currency);
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white transition-colors">
       <Header
@@ -303,7 +306,7 @@ export default function DashboardOverviewPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricsCard
             title="Recovered Revenue"
-            value={roiMetrics ? roiMetrics.recovered_revenue_formatted : "$0.00"}
+            value={roiMetrics ? (roiMetrics.recovered_revenue_formatted || formatCurrency(roiMetrics.recovered_revenue, currency)) : formatCurrency(0, currency)}
             icon={DollarSign}
             trend={{
               value: `${roiMetrics?.recovered_carts_count || 0} carts recovered`,
@@ -339,10 +342,12 @@ export default function DashboardOverviewPage() {
             value={`${roiMetrics?.support_hours_saved || 0} hrs`}
             icon={ShieldCheck}
             trend={{
-              value: `~$${roiMetrics?.support_cost_saved || 0} labor saved`,
+              value: roiMetrics?.support_cost_saved_formatted
+                ? `~${roiMetrics.support_cost_saved_formatted} labor saved`
+                : `~${formatCurrency(roiMetrics?.support_cost_saved || 0, currency)} labor saved`,
               isPositive: true,
             }}
-            description="@ $15/hr (8 min/inquiry benchmark)"
+            description={currency === "PKR" ? "@ Rs. 1,000/hr (8 min/inquiry benchmark)" : "@ $15/hr (8 min/inquiry benchmark)"}
             accentColor="purple"
           />
         </div>
@@ -365,7 +370,7 @@ export default function DashboardOverviewPage() {
 
                 <div className="flex items-center gap-2">
                   <Badge variant="success" className="font-mono text-xs px-2.5 py-1">
-                    7-Day Total: {roiMetrics?.recovered_revenue_formatted || "$0.00"}
+                    7-Day Total: {roiMetrics?.recovered_revenue_formatted || formatCurrency(roiMetrics?.recovered_revenue || 0, currency)}
                   </Badge>
                 </div>
               </div>
@@ -387,12 +392,12 @@ export default function DashboardOverviewPage() {
                             <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group relative">
                               {/* Amount Tooltip on hover */}
                               <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-9 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] font-bold py-1 px-2 rounded-lg shadow-lg pointer-events-none whitespace-nowrap z-20">
-                                ${point.recovered_amount.toFixed(2)} ({point.carts_count} {point.carts_count === 1 ? "cart" : "carts"})
+                                {formatCurrency(point.recovered_amount, currency)} ({point.carts_count} {point.carts_count === 1 ? "cart" : "carts"})
                               </div>
 
                               {/* Amount Label above bar (if > 0) */}
                               <span className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 font-bold truncate max-w-full">
-                                {point.recovered_amount > 0 ? `$${point.recovered_amount.toFixed(0)}` : "$0"}
+                                {point.recovered_amount > 0 ? formatCurrency(point.recovered_amount, currency) : formatCurrency(0, currency)}
                               </span>
 
                               {/* The Bar Track and Fill */}
@@ -427,8 +432,8 @@ export default function DashboardOverviewPage() {
                 <span className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold block">Avg Recovery Value</span>
                 <span className="font-bold text-zinc-900 dark:text-white mt-0.5 block">
                   {roiMetrics && roiMetrics.recovered_carts_count > 0
-                    ? `$${(roiMetrics.recovered_revenue / roiMetrics.recovered_carts_count).toFixed(2)} / cart`
-                    : "$0.00"}
+                    ? `${formatCurrency(roiMetrics.recovered_revenue / roiMetrics.recovered_carts_count, currency)} / cart`
+                    : formatCurrency(0, currency)}
                 </span>
               </div>
               <div className="bg-zinc-50 dark:bg-zinc-800/40 p-2.5 rounded-xl border border-zinc-100 dark:border-zinc-800">
@@ -494,6 +499,7 @@ export default function DashboardOverviewPage() {
                   roiMetrics.recent_recoveries.slice(0, 6).map((item) => {
                     const isRecovered = item.is_recovered || item.status.toLowerCase() === "recovered";
                     const isDispatched = item.status.toLowerCase() === "dispatched";
+                    const itemCurr = item.currency || currency;
 
                     return (
                       <div
@@ -521,7 +527,7 @@ export default function DashboardOverviewPage() {
 
                         <div className="text-right shrink-0 space-y-1">
                           <div className="font-black text-xs text-zinc-900 dark:text-white">
-                            ${item.cart_value.toFixed(2)}
+                            {item.cart_value_formatted || formatCurrency(item.cart_value, itemCurr)}
                           </div>
                           <div>
                             {isRecovered ? (
@@ -854,7 +860,10 @@ export default function DashboardOverviewPage() {
           storeId={activeStore.id}
           storeName={activeStore.name}
           onClose={() => setIsShopifyModalOpen(false)}
-          onSuccess={() => loadStoreCatalog(activeStore.id)}
+          onSuccess={() => {
+            loadStoreCatalog(activeStore.id);
+            loadDashboard();
+          }}
         />
       )}
 
@@ -865,7 +874,10 @@ export default function DashboardOverviewPage() {
           storeId={activeStore.id}
           storeName={activeStore.name}
           onClose={() => setIsWooCommerceModalOpen(false)}
-          onSuccess={() => loadStoreCatalog(activeStore.id)}
+          onSuccess={() => {
+            loadStoreCatalog(activeStore.id);
+            loadDashboard();
+          }}
         />
       )}
 

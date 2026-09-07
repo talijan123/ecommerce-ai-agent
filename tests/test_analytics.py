@@ -239,3 +239,31 @@ class TestMerchantRoiAnalytics:
         dataB = resB.json()
         assert dataB["recovered_revenue"] == 500.0
         assert dataB["total_abandoned_carts"] == 1
+
+    def test_dynamic_pkr_currency_formatting(self, db_session, store_a):
+        """Test that PKR currency in cart items formats metrics with Rs. prefix."""
+        c_pkr = CartSession(
+            store_id=store_a.id,
+            session_id=f"cs_pkr_{uuid.uuid4().hex[:10]}",
+            customer_name="Usman Tariq",
+            customer_email=f"usman_{uuid.uuid4().hex[:6]}@example.com",
+            abandoned_items=[
+                {"title": "Kurta Shalwar", "quantity": 1, "price": 14500.0, "currency": "PKR"}
+            ],
+            is_recovered=True,
+            status="recovered",
+            customer_response_at=datetime.now(timezone.utc),
+        )
+        db_session.add(c_pkr)
+        db_session.commit()
+
+        res = client.get(f"/api/v1/analytics/dashboard-metrics?store_id={store_a.id}")
+        assert res.status_code == 200
+        data = res.json()
+
+        assert data["currency"] == "PKR"
+        assert data["currency_symbol"] == "Rs. "
+        assert data["recovered_revenue"] == 14500.0
+        assert "Rs. 14,500.00" in data["recovered_revenue_formatted"]
+        assert len(data["recent_recoveries"]) > 0
+        assert "Rs. 14,500.00" in data["recent_recoveries"][0]["cart_value_formatted"]

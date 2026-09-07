@@ -26,14 +26,14 @@ import {
   Info,
 } from "lucide-react";
 import { Button } from "@/lib/ui";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatApiError, IntegrationResponse } from "@/lib/api";
 
 interface ShopifyConnectModalProps {
   isOpen: boolean;
   storeId: string;
   storeName: string;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (result?: IntegrationResponse) => void;
 }
 
 type AuthMode = "oauth" | "legacy_token";
@@ -115,12 +115,12 @@ export function ShopifyConnectModal({
           : `Successfully connected ${cleanDomain}! Catalog synchronization is in progress.`
       );
 
-      // Trigger catalog reload
-      onSuccess?.();
+      // Trigger immediate callback with updated integration data
+      onSuccess?.(result);
 
       setTimeout(() => {
         onClose();
-      }, 2200);
+      }, 1800);
     } catch (err: any) {
       const formatted = formatApiError(err);
       setErrorMsg(formatted);

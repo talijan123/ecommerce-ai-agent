@@ -17,6 +17,7 @@ import {
   CheckCircle,
   X,
   Code,
+  ShoppingBag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -33,6 +34,12 @@ const NAV_ITEMS = [
     title: "Catalog & Inventory",
     href: "/dashboard/catalog",
     icon: Package,
+  },
+  {
+    title: "Store Integrations",
+    href: "/dashboard/integrations",
+    icon: ShoppingBag,
+    badge: "Sync",
   },
   {
     title: "Storefront Widget",

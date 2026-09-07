@@ -19,7 +19,7 @@ interface WooCommerceConnectModalProps {
   storeId: string;
   storeName: string;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (result?: any) => void;
 }
 
 export function WooCommerceConnectModal({
@@ -51,7 +51,7 @@ export function WooCommerceConnectModal({
 
     try {
       setLoading(true);
-      await api.connectWooCommerce({
+      const connRes = await api.connectWooCommerce({
         store_id: storeId,
         shop_domain: shopDomain.trim(),
         consumer_key: consumerKey.trim() || undefined,
@@ -65,8 +65,10 @@ export function WooCommerceConnectModal({
         `Connected to ${shopDomain}! Successfully synchronized ${syncRes.products_synced} products into your active catalog.`
       );
 
+      // Trigger immediate callback with updated data
+      onSuccess?.(connRes || syncRes);
+
       setTimeout(() => {
-        onSuccess?.();
         onClose();
       }, 1500);
     } catch (err: any) {

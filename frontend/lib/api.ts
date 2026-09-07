@@ -315,6 +315,9 @@ export interface RecentRecoveryItem {
   customer_email: string;
   product_summary: string;
   cart_value: number;
+  cart_value_formatted?: string;
+  currency?: string;
+  currency_symbol?: string;
   discount_code: string;
   discount_percentage: number;
   status: string;
@@ -326,6 +329,7 @@ export interface EnterpriseRoiMetrics {
   recovered_revenue: number;
   recovered_revenue_formatted: string;
   currency: string;
+  currency_symbol: string;
   total_abandoned_carts: number;
   recovered_carts_count: number;
   recovery_rate_pct: number;
@@ -335,6 +339,7 @@ export interface EnterpriseRoiMetrics {
   ai_resolution_rate_pct: number;
   support_hours_saved: number;
   support_cost_saved: number;
+  support_cost_saved_formatted?: string;
   weekly_revenue_trend: WeeklyRevenuePoint[];
   recent_recoveries: RecentRecoveryItem[];
 }
