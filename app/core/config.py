@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     # Shopify Store API Settings (Live E-Commerce Integration)
     SHOPIFY_STORE_URL: str = Field(default="")
     SHOPIFY_ACCESS_TOKEN: str = Field(default="")
+    SHOPIFY_CLIENT_ID: str = Field(default="")
+    SHOPIFY_CLIENT_SECRET: str = Field(default="")
     SHOPIFY_API_VERSION: str = Field(default="2024-01")
 
     # Abandoned Cart Background Worker & Recovery Settings

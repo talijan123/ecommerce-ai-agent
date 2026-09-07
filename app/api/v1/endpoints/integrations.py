@@ -13,6 +13,7 @@ from sqlalchemy import or_
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.core.config import settings
 from app.models.user import User
 from app.models.store import Store
 from app.models.product import Product
@@ -146,9 +147,13 @@ def connect_shopify(
             detail="Invalid Shopify domain. Please provide a valid store domain (e.g. brand.myshopify.com).",
         )
 
-    resolved_client_id = payload.client_id or payload.api_key
-    resolved_client_secret = payload.client_secret
-    access_token = payload.access_token
+    resolved_client_id = payload.client_id or payload.api_key or settings.SHOPIFY_CLIENT_ID
+    resolved_client_secret = payload.client_secret or settings.SHOPIFY_CLIENT_SECRET
+    access_token = payload.access_token or (
+        settings.SHOPIFY_ACCESS_TOKEN
+        if settings.SHOPIFY_STORE_URL and ShopifySyncService.clean_shop_domain(settings.SHOPIFY_STORE_URL) == clean_domain
+        else None
+    )
 
     # 1. If Client ID & Client Secret are provided, exchange them for an Admin API access token
     if resolved_client_id and resolved_client_secret and not access_token:
