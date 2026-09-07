@@ -37,10 +37,10 @@
   style.textContent = `
     .ac-widget-launcher {
       position: fixed;
-      bottom: 24px;
-      ${position === "left" ? "left: 24px;" : "right: 24px;"}
-      width: 60px;
-      height: 60px;
+      bottom: 20px;
+      ${position === "left" ? "left: 20px;" : "right: 20px;"}
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
       background: ${themeColor};
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.15);
@@ -62,8 +62,8 @@
       transform: scale(0.95);
     }
     .ac-widget-launcher svg {
-      width: 28px;
-      height: 28px;
+      width: 26px;
+      height: 26px;
       fill: currentColor;
       transition: transform 0.2s ease;
     }
@@ -75,18 +75,19 @@
     }
     .ac-widget-container {
       position: fixed;
-      bottom: 96px;
-      ${position === "left" ? "left: 24px;" : "right: 24px;"}
-      width: 400px;
+      bottom: 90px;
+      ${position === "left" ? "left: 20px;" : "right: 20px;"}
+      width: 380px;
       max-width: calc(100vw - 32px);
-      height: 620px;
+      height: 580px;
       max-height: calc(100vh - 120px);
-      border-radius: 20px;
+      border-radius: 16px;
       overflow: hidden;
-      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       z-index: 999999;
       opacity: 0;
-      transform: translateY(20px) scale(0.96);
+      transform: translateY(16px) scale(0.97);
       pointer-events: none;
       transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
       background: #09090b;
@@ -101,6 +102,7 @@
       height: 100%;
       border: none;
       display: block;
+      background: #09090b;
     }
     .ac-widget-badge {
       position: absolute;
@@ -115,17 +117,17 @@
     /* Proactive Nudge Teaser Bubble */
     .ac-widget-nudge {
       position: fixed;
-      bottom: 96px;
-      ${position === "left" ? "left: 24px;" : "right: 24px;"}
+      bottom: 90px;
+      ${position === "left" ? "left: 20px;" : "right: 20px;"}
       width: 300px;
       max-width: calc(100vw - 48px);
       padding: 14px 16px;
-      border-radius: 18px;
+      border-radius: 16px;
       background: rgba(18, 18, 22, 0.95);
       border: 1px solid rgba(255, 255, 255, 0.14);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.05);
       color: #ffffff;
       z-index: 999997;
       opacity: 0;

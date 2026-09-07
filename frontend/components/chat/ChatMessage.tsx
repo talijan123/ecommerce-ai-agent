@@ -70,25 +70,33 @@ export function ChatMessage({ message, onSelectAction }: ChatMessageProps) {
       if (line.trim().startsWith("•") || line.trim().startsWith("- ") || line.trim().startsWith("* ")) {
         const cleanLine = line.replace(/^[\s•*-]+/, "").trim();
         return (
-          <li key={idx} className="ml-4 list-disc text-zinc-300 my-0.5">
-            {formatInlineText(cleanLine)}
-          </li>
+          <div key={idx} className="flex items-start gap-1.5 my-0.5 text-zinc-300">
+            <span className="text-blue-400 select-none text-[11px] mt-0.5 shrink-0">•</span>
+            <span className="flex-1 break-words">{formatInlineText(cleanLine)}</span>
+          </div>
         );
       }
 
       // Render numbered list
       if (/^\d+\.\s/.test(line.trim())) {
         const cleanLine = line.replace(/^\d+\.\s*/, "").trim();
+        const num = line.trim().match(/^(\d+)\./)?.[1] || "1";
         return (
-          <li key={idx} className="ml-4 list-decimal text-zinc-300 my-0.5">
-            {formatInlineText(cleanLine)}
-          </li>
+          <div key={idx} className="flex items-start gap-1.5 my-0.5 text-zinc-300">
+            <span className="text-blue-400 font-bold select-none text-[11px] shrink-0">{num}.</span>
+            <span className="flex-1 break-words">{formatInlineText(cleanLine)}</span>
+          </div>
         );
       }
 
-      // Render line with inline formatting
+      // Blank line spacer
+      if (line.trim() === "") {
+        return <div key={idx} className="h-1.5" />;
+      }
+
+      // Render standard line with inline formatting
       return (
-        <p key={idx} className={cn("my-1", line.trim() === "" ? "h-2" : "")}>
+        <div key={idx} className="my-0.5 leading-relaxed break-words">
           {formatInlineText(line)}
           {promoMatch && !isUser && (
             <span className="inline-flex items-center gap-1.5 ml-2 px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono text-[11px] font-bold">
@@ -106,7 +114,7 @@ export function ChatMessage({ message, onSelectAction }: ChatMessageProps) {
               </button>
             </span>
           )}
-        </p>
+        </div>
       );
     });
   };

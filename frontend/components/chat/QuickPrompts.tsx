@@ -41,8 +41,8 @@ export function QuickPrompts({ onSelectPrompt, disabled }: QuickPromptsProps) {
   ];
 
   return (
-    <div className="relative py-2">
-      <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-1 no-scrollbar scroll-smooth">
+    <div className="shrink-0 px-3 py-2 overflow-x-auto whitespace-nowrap">
+      <div className="flex items-center gap-1.5 no-scrollbar scroll-smooth">
         {prompts.map((p, idx) => {
           const Icon = p.icon;
           return (
@@ -50,7 +50,7 @@ export function QuickPrompts({ onSelectPrompt, disabled }: QuickPromptsProps) {
               key={idx}
               disabled={disabled}
               onClick={() => onSelectPrompt(p.prompt)}
-              className="group flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-zinc-800/90 bg-zinc-900/80 px-3 py-1.5 text-[11px] font-medium text-zinc-300 hover:border-blue-500/40 hover:bg-zinc-800 hover:text-white transition-all duration-200 disabled:opacity-50 active:scale-95 shrink-0 shadow-sm"
+              className="group flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-zinc-800/90 bg-zinc-900/80 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:border-blue-500/40 hover:bg-zinc-800 hover:text-white transition-all duration-200 disabled:opacity-50 active:scale-95 shrink-0 shadow-sm"
             >
               <Icon className="h-3 w-3 text-blue-400 group-hover:text-blue-300 transition-colors" />
               <span>{p.label}</span>
