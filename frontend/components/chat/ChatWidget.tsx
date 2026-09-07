@@ -292,7 +292,7 @@ export function ChatWidget({
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="Ask anything (e.g. 'Where is order #1042?', 'Size L in stock?')..."
+              placeholder="Ask anything (e.g. 'Track my order', 'Check stock', 'Help with sizing')..."
               className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-blue-500/60 transition-colors shadow-inner"
             />
             <Button

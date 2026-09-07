@@ -319,43 +319,38 @@ export default function StorefrontPage() {
             </span>
             <div className="flex flex-wrap justify-center gap-2 max-w-3xl mx-auto">
               <button
-                onClick={() => triggerAiChat("Where is my order #1042?")}
+                onClick={() => triggerAiChat("Can you help me track my recent order?")}
                 className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 hover:border-blue-500/50 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all active:scale-95 shadow-sm"
               >
                 <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 group-hover:scale-110 transition-transform" />
-                <span>"Where is order #1042?"</span>
+                <span>"Track my order"</span>
                 <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Live Tracking</span>
               </button>
 
               <button
-                onClick={() => triggerAiChat("Do you have the Essence Mascara Lash Princess in size 30ml?")}
+                onClick={() => triggerAiChat("Do you have items in stock right now?")}
                 className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 hover:border-amber-500/50 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all active:scale-95 shadow-sm"
               >
                 <TrendingUp className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400 group-hover:scale-110 transition-transform" />
-                <span>"Mascara stock check?"</span>
+                <span>"Check stock"</span>
                 <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Stock Intelligence</span>
               </button>
 
               <button
-                onClick={() =>
-                  triggerAiChat(
-                    "Can I get a discount code for my abandoned cart? My email is sarah.smith@example.com",
-                    "sarah.smith@example.com"
-                  )
-                }
+                onClick={() => triggerAiChat("Can I get a discount promo code for my cart items?")}
                 className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 hover:border-emerald-500/50 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all active:scale-95 shadow-sm"
               >
                 <Tag className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
-                <span>"Cart promo for Sarah"</span>
+                <span>"Cart discount code"</span>
                 <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Cart Recovery</span>
               </button>
 
               <button
-                onClick={() => triggerAiChat("Mera order #1043 kab tak deliver hoga?")}
+                onClick={() => triggerAiChat("Mera order kab tak deliver hoga?")}
                 className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 hover:border-purple-500/50 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all active:scale-95 shadow-sm"
               >
                 <Zap className="h-3.5 w-3.5 text-purple-500 dark:text-purple-400 group-hover:scale-110 transition-transform" />
-                <span>"Mera order #1043?"</span>
+                <span>"Roman Urdu support"</span>
                 <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Roman Urdu</span>
               </button>
             </div>

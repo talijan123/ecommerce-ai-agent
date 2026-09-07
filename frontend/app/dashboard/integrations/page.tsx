@@ -83,8 +83,21 @@ export default function IntegrationsPage() {
         api.getStoreIntegrations(storeId).catch(() => []),
         api.getStoreProducts(storeId).catch(() => []),
       ]);
-      setIntegrations(integrationsData);
-      setProducts(productsData);
+      setIntegrations((prev) => {
+        if (!integrationsData || integrationsData.length === 0) {
+          return prev;
+        }
+        const merged = [...integrationsData];
+        for (const item of prev) {
+          if (!merged.some((m) => m.platform === item.platform)) {
+            merged.push(item);
+          }
+        }
+        return merged;
+      });
+      if (productsData && productsData.length > 0) {
+        setProducts(productsData);
+      }
     } catch (err) {
       console.error("Error loading store integrations:", err);
     }
@@ -406,7 +419,7 @@ export default function IntegrationsPage() {
         {/* ========================================================================= */}
         <Card className={`relative overflow-hidden transition-all duration-300 rounded-3xl border ${
           isShopifyConnected
-            ? "border-emerald-500/30 dark:border-emerald-500/20 bg-gradient-to-b from-emerald-500/[0.03] to-transparent"
+            ? "border-emerald-500/30 dark:border-emerald-500/20 bg-gradient-to-b from-emerald-500/[0.04] to-transparent shadow-emerald-500/5"
             : "border-zinc-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/60"
         } backdrop-blur-xl shadow-lg hover:shadow-xl`}>
           <div className="p-6 sm:p-7 space-y-6">
@@ -431,9 +444,9 @@ export default function IntegrationsPage() {
 
               {/* Reactive Status Badge */}
               {isShopifyConnected ? (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-in fade-in duration-300">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-in fade-in duration-300 shadow-sm shadow-emerald-500/10">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Connected
+                  <span>Active &amp; Connected</span>
                 </div>
               ) : (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
@@ -446,14 +459,14 @@ export default function IntegrationsPage() {
             <div className="p-4 rounded-2xl bg-zinc-50/80 dark:bg-zinc-950/50 border border-zinc-200/60 dark:border-zinc-800/60 space-y-3">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                  <Globe className="h-3.5 w-3.5" /> Connected Domain
+                  <Globe className="h-3.5 w-3.5 text-emerald-500" /> Connected Domain
                 </span>
                 {shopifyIntegration?.shop_domain ? (
                   <a
                     href={`https://${shopifyIntegration.shop_domain}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline"
+                    className="font-mono font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline bg-emerald-500/10 dark:bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/20"
                   >
                     {shopifyIntegration.shop_domain}
                     <ExternalLink className="h-3 w-3" />
@@ -465,16 +478,16 @@ export default function IntegrationsPage() {
 
               <div className="flex items-center justify-between text-xs">
                 <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                  <PackageCheck className="h-3.5 w-3.5" /> Synced Catalog Items
+                  <PackageCheck className="h-3.5 w-3.5 text-emerald-500" /> Synced Catalog
                 </span>
-                <span className="font-bold text-zinc-900 dark:text-white">
+                <span className="font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/20">
                   {shopifyIntegration?.products_synced_count ?? 0} Products Synced
                 </span>
               </div>
 
               <div className="flex items-center justify-between text-xs">
                 <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5" /> Last Synchronized
+                  <Clock className="h-3.5 w-3.5 text-zinc-400" /> Last Synchronized
                 </span>
                 <span className="font-medium text-zinc-700 dark:text-zinc-300">
                   {formatSyncTime("shopify", shopifyIntegration?.last_synced_at || shopifyIntegration?.updated_at)}
@@ -484,7 +497,7 @@ export default function IntegrationsPage() {
 
             {/* 1-Click Theme App Embed Activation (when connected) */}
             {isShopifyConnected && (
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 space-y-2.5">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 space-y-2.5 animate-in fade-in duration-300">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-emerald-500" />
@@ -513,27 +526,27 @@ export default function IntegrationsPage() {
             )}
 
             {/* Actions Bar */}
-            <div className="flex items-center gap-3 pt-1">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
               {isShopifyConnected ? (
                 <>
                   <Button
-                    variant="gradient"
+                    variant="outline"
                     size="sm"
-                    className="flex-1 rounded-2xl min-h-[42px] font-semibold text-xs shadow-md shadow-emerald-500/20"
+                    className="flex-1 rounded-2xl min-h-[42px] font-semibold text-xs border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 shadow-sm"
                     onClick={handleReSyncShopify}
                     disabled={syncingPlatform === "shopify"}
                   >
                     <RefreshCw
                       className={`h-4 w-4 mr-2 ${
-                        syncingPlatform === "shopify" ? "animate-spin" : ""
+                        syncingPlatform === "shopify" ? "animate-spin text-emerald-500" : "text-emerald-500"
                       }`}
                     />
-                    {syncingPlatform === "shopify" ? "Syncing Live Catalog..." : "Re-sync Catalog"}
+                    {syncingPlatform === "shopify" ? "Syncing Catalog..." : "Re-sync Catalog"}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="rounded-2xl min-h-[42px] font-semibold text-xs border-zinc-300 dark:border-zinc-700"
+                    className="rounded-2xl min-h-[42px] font-semibold text-xs border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                     onClick={() => setIsShopifyModalOpen(true)}
                   >
                     Configure / Reconnect

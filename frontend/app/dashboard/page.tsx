@@ -488,11 +488,13 @@ export default function DashboardOverviewPage() {
               {/* Recovery Feed List */}
               <div className="mt-4 space-y-2.5 max-h-[290px] overflow-y-auto custom-scrollbar pr-1">
                 {(!roiMetrics?.recent_recoveries || roiMetrics.recent_recoveries.length === 0) ? (
-                  <div className="p-8 text-center text-zinc-400 text-xs space-y-2">
+                  <div className="p-8 text-center text-zinc-400 text-xs space-y-2 rounded-2xl bg-zinc-50/50 dark:bg-zinc-950/40 border border-dashed border-zinc-200 dark:border-zinc-800">
                     <ShoppingCart className="h-8 w-8 mx-auto text-zinc-300 dark:text-zinc-600 opacity-60" />
-                    <p className="font-medium">No abandoned cart sessions yet</p>
+                    <p className="font-semibold text-zinc-700 dark:text-zinc-300">
+                      No abandoned checkouts detected yet.
+                    </p>
                     <p className="text-[11px] text-zinc-500 max-w-xs mx-auto">
-                      Abandoned carts captured from webhooks or storefront will appear here with automated WhatsApp recovery tracking.
+                      Live recoveries will appear here automatically when shoppers drop off.
                     </p>
                   </div>
                 ) : (

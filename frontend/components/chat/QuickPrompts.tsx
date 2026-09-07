@@ -9,34 +9,34 @@ interface QuickPromptsProps {
 export function QuickPrompts({ onSelectPrompt, disabled }: QuickPromptsProps) {
   const prompts = [
     {
-      label: "Track Order #1042",
-      prompt: "Where is my order #1042?",
+      label: "Track My Order",
+      prompt: "Can you help me track my recent order?",
       icon: Package,
     },
     {
-      label: "White T-Shirt in Size L?",
-      prompt: "Do you have the Classic White T-Shirt in size L?",
+      label: "Check Product Stock",
+      prompt: "Do you have items in stock right now?",
       icon: Search,
     },
     {
-      label: "Cart Promo (Sarah)",
-      prompt: "Can I get a discount code for my abandoned cart? My email is sarah.smith@example.com",
-      icon: Tag,
-    },
-    {
-      label: "Under $60 Apparel",
-      prompt: "Show me all apparel items under $60 with available stock.",
+      label: "Help with Sizing",
+      prompt: "Can you help me choose the right size and fit?",
       icon: Sparkles,
     },
     {
-      label: "Roman Urdu (Order 1043)",
-      prompt: "Mera order #1043 kab deliver hoga?",
+      label: "Cart Discount Promo",
+      prompt: "Can I get a discount promo code for my cart?",
+      icon: Tag,
+    },
+    {
+      label: "Roman Urdu Support",
+      prompt: "Mera order kab deliver hoga?",
       icon: Globe,
     },
     {
-      label: "Noise Canceling Headphones",
-      prompt: "What are the specs and battery life of the wireless headphones?",
-      icon: Headphones,
+      label: "Shipping & Delivery",
+      prompt: "What are your shipping rates and estimated delivery times?",
+      icon: Package,
     },
   ];
 
