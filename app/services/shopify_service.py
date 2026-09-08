@@ -199,11 +199,8 @@ class ShopifySyncService:
         """Strip HTML tags and convert entities to plain text."""
         if not raw_html:
             return ""
-        # Remove HTML tags
         clean_text = re.sub(r"<[^>]+>", " ", str(raw_html))
-        # Decode HTML entities like &amp;, &nbsp;, &#39;
         clean_text = html.unescape(clean_text)
-        # Collapse whitespace
         clean_text = re.sub(r"\s+", " ", clean_text).strip()
         return clean_text
 
@@ -224,6 +221,225 @@ class ShopifySyncService:
         ):
             return True
         return False
+
+    @classmethod
+    def get_widget_script_url(cls, override_url: Optional[str] = None) -> str:
+        """Resolve public CDN/frontend URL for widget.js script tag."""
+        if override_url and override_url.strip():
+            return override_url.strip()
+        if getattr(settings, "WIDGET_JS_URL", "") and settings.WIDGET_JS_URL.strip():
+            return settings.WIDGET_JS_URL.strip()
+        frontend_url = getattr(settings, "FRONTEND_URL", "https://ecommerce-store-frontend-swart.vercel.app").strip().rstrip("/")
+        return f"{frontend_url}/widget.js"
+
+    @classmethod
+    def list_script_tags(
+        cls,
+        shop_domain: str,
+        access_token: Optional[str],
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch registered ScriptTags from Shopify Admin REST API:
+        GET https://{shop_domain}/admin/api/2024-01/script_tags.json
+        """
+        clean_domain = cls.clean_shop_domain(shop_domain)
+        if not clean_domain or cls.is_mock_or_test_token(access_token, clean_domain):
+            return []
+
+        url = f"https://{clean_domain}/admin/api/{cls.API_VERSION}/script_tags.json"
+        headers = {
+            "X-Shopify-Access-Token": access_token.strip() if access_token else "",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                res = client.get(url, headers=headers)
+                if res.status_code == 200:
+                    return res.json().get("script_tags", [])
+                logger.warning(
+                    f"[ShopifyScriptTag] list_script_tags returned HTTP {res.status_code} for {clean_domain}: {res.text[:200]}"
+                )
+                return []
+        except Exception as e:
+            logger.error(f"[ShopifyScriptTag] Error listing script tags for {clean_domain}: {e}")
+            return []
+
+    @classmethod
+    def ensure_widget_script_tag(
+        cls,
+        shop_domain: str,
+        access_token: Optional[str],
+        script_url: Optional[str] = None,
+    ) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+        """
+        Ensure our AutoCommerce AI storefront chat widget is injected via Shopify ScriptTag API:
+        POST https://{shop_domain}/admin/api/2024-01/script_tags.json
+        {
+          "script_tag": {
+            "event": "onload",
+            "src": "https://<FRONTEND_DOMAIN>/widget.js",
+            "display_scope": "all"
+          }
+        }
+        """
+        clean_domain = cls.clean_shop_domain(shop_domain)
+        if not clean_domain:
+            return False, None, "Invalid Shopify shop domain."
+
+        target_src = cls.get_widget_script_url(script_url)
+
+        # Handle mock/sandbox testing
+        if cls.is_mock_or_test_token(access_token, clean_domain):
+            logger.info(f"[ShopifyScriptTag] Mocking ScriptTag injection for {clean_domain} -> {target_src}")
+            mock_tag = {
+                "id": 99012345,
+                "src": target_src,
+                "event": "onload",
+                "display_scope": "all",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+            return True, mock_tag, None
+
+        if not access_token or not access_token.strip():
+            return False, None, "Missing Shopify Admin API access token for script tag injection."
+
+        # 1. Check if a script tag pointing to widget.js already exists
+        existing_tags = cls.list_script_tags(clean_domain, access_token)
+        for tag in existing_tags:
+            src = (tag.get("src") or "").strip()
+            if src == target_src or "widget.js" in src:
+                logger.info(f"[ShopifyScriptTag] Widget ScriptTag already active on {clean_domain} (ID: {tag.get('id')})")
+                return True, tag, None
+
+        # 2. Inject ScriptTag
+        url = f"https://{clean_domain}/admin/api/{cls.API_VERSION}/script_tags.json"
+        headers = {
+            "X-Shopify-Access-Token": access_token.strip(),
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        payload = {
+            "script_tag": {
+                "event": "onload",
+                "src": target_src,
+                "display_scope": "all",
+            }
+        }
+
+        try:
+            with httpx.Client(timeout=15.0) as client:
+                res = client.post(url, json=payload, headers=headers)
+                if res.status_code in (200, 201):
+                    created_tag = res.json().get("script_tag", {})
+                    logger.info(f"[ShopifyScriptTag] Successfully injected widget ScriptTag on {clean_domain} (ID: {created_tag.get('id')})")
+                    return True, created_tag, None
+                else:
+                    err_msg = f"HTTP {res.status_code}: {res.text[:300]}"
+                    logger.warning(f"[ShopifyScriptTag] Failed to inject ScriptTag on {clean_domain}: {err_msg}")
+                    return False, None, err_msg
+        except Exception as e:
+            err_msg = f"Connection error injecting ScriptTag: {str(e)}"
+            logger.error(f"[ShopifyScriptTag] Error on {clean_domain}: {err_msg}")
+            return False, None, err_msg
+
+    @classmethod
+    def delete_widget_script_tag(
+        cls,
+        shop_domain: str,
+        access_token: Optional[str],
+        script_url: Optional[str] = None,
+    ) -> Tuple[bool, int, Optional[str]]:
+        """
+        Remove our widget ScriptTags from the merchant's store on disconnect:
+        DELETE https://{shop_domain}/admin/api/2024-01/script_tags/{script_tag_id}.json
+        """
+        clean_domain = cls.clean_shop_domain(shop_domain)
+        if not clean_domain:
+            return False, 0, "Invalid Shopify shop domain."
+
+        target_src = cls.get_widget_script_url(script_url)
+
+        if cls.is_mock_or_test_token(access_token, clean_domain):
+            logger.info(f"[ShopifyScriptTag] Mocking ScriptTag deletion for {clean_domain}")
+            return True, 1, None
+
+        if not access_token or not access_token.strip():
+            return False, 0, "Missing access token for ScriptTag removal."
+
+        existing_tags = cls.list_script_tags(clean_domain, access_token)
+        deleted_count = 0
+        headers = {
+            "X-Shopify-Access-Token": access_token.strip(),
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+        with httpx.Client(timeout=10.0) as client:
+            for tag in existing_tags:
+                src = (tag.get("src") or "").strip()
+                tag_id = tag.get("id")
+                if (src == target_src or "widget.js" in src) and tag_id:
+                    del_url = f"https://{clean_domain}/admin/api/{cls.API_VERSION}/script_tags/{tag_id}.json"
+                    try:
+                        res = client.delete(del_url, headers=headers)
+                        if res.status_code in (200, 204):
+                            deleted_count += 1
+                            logger.info(f"[ShopifyScriptTag] Deleted ScriptTag {tag_id} from {clean_domain}")
+                        else:
+                            logger.warning(f"[ShopifyScriptTag] Failed deleting ScriptTag {tag_id}: HTTP {res.status_code}")
+                    except Exception as e:
+                        logger.error(f"[ShopifyScriptTag] Error deleting ScriptTag {tag_id}: {e}")
+
+        return True, deleted_count, None
+
+    @classmethod
+    def exchange_authorization_code(
+        cls,
+        shop_domain: str,
+        code: str,
+        client_id: Optional[str] = None,
+        client_secret: Optional[str] = None,
+    ) -> Tuple[Optional[str], Optional[Dict[str, Any]], Optional[str]]:
+        """
+        Exchange OAuth authorization code for permanent offline access token via:
+        POST https://{shop_domain}/admin/oauth/access_token
+        """
+        clean_domain = cls.clean_shop_domain(shop_domain)
+        cid = (client_id or getattr(settings, "SHOPIFY_CLIENT_ID", "") or "").strip()
+        sec = (client_secret or getattr(settings, "SHOPIFY_CLIENT_SECRET", "") or "").strip()
+        if not clean_domain:
+            return None, None, "Invalid Shopify store domain."
+
+        if cls.is_mock_or_test_token(code, clean_domain):
+            mock_token = f"shpat_mock_{uuid.uuid4().hex[:16]}"
+            return mock_token, {"access_token": mock_token}, None
+
+        token_url = f"https://{clean_domain}/admin/oauth/access_token"
+        payload = {
+            "client_id": cid,
+            "client_secret": sec,
+            "code": code,
+        }
+
+        try:
+            with httpx.Client(timeout=20.0, follow_redirects=True) as client:
+                res = client.post(
+                    token_url,
+                    json=payload,
+                    headers={"Content-Type": "application/json", "Accept": "application/json"},
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    token = data.get("access_token")
+                    if token:
+                        return token, data, None
+                    return None, data, f"Token missing in response: {res.text}"
+                return None, None, f"HTTP {res.status_code}: {res.text[:200]}"
+        except Exception as e:
+            return None, None, f"Error exchanging code: {str(e)}"
 
     @classmethod
     def exchange_client_credentials(

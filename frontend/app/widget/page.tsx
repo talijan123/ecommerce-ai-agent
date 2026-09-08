@@ -10,13 +10,14 @@ import { Badge, Button } from "@/lib/ui";
 function WidgetContent() {
   const searchParams = useSearchParams();
   const storeId = searchParams.get("store_id") || undefined;
+  const shopDomain = searchParams.get("shop_domain") || undefined;
   const embed = searchParams.get("embed") === "true";
   const themeColor = searchParams.get("theme_color") || "#4f46e5";
 
   if (embed) {
     return (
       <div className="h-screen w-screen bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden">
-        <ChatWidget standalone={true} embed={true} storeId={storeId} themeColor={themeColor} />
+        <ChatWidget standalone={true} embed={true} storeId={storeId} shopDomain={shopDomain} themeColor={themeColor} />
       </div>
     );
   }

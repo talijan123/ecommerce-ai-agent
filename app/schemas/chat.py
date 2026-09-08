@@ -11,6 +11,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., description="Natural language customer query", min_length=1)
     customer_email: Optional[str] = Field(None, description="Optional customer email for auto-identification")
     store_id: Optional[str] = Field(None, description="Optional tenant store UUID")
+    shop_domain: Optional[str] = Field(None, description="Optional Shopify store domain (e.g. store.myshopify.com)")
 
 
 class ToolInvocationLog(BaseModel):

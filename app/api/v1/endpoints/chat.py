@@ -31,6 +31,7 @@ def send_chat_message(
             user_message=payload.message,
             customer_email=payload.customer_email,
             store_id=payload.store_id,
+            shop_domain=payload.shop_domain,
         )
 
         formatted_tools = [

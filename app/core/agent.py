@@ -53,6 +53,7 @@ def run_agent_turn(
     user_message: str,
     customer_email: Optional[str] = None,
     store_id: Optional[Any] = None,
+    shop_domain: Optional[str] = None,
     max_turns: int = 5,
 ) -> Tuple[str, List[Dict[str, Any]], bool]:
     """
@@ -64,6 +65,7 @@ def run_agent_turn(
         user_message: Natural language customer query.
         customer_email: Optional customer email for session context.
         store_id: Optional tenant store UUID for multi-tenant data isolation.
+        shop_domain: Optional Shopify shop domain to resolve store tenant.
         max_turns: Maximum tool execution turns to prevent infinite loops.
 
     Returns:
@@ -72,6 +74,8 @@ def run_agent_turn(
     import uuid as _uuid_mod
     from app.services.ai_support_service import sanitize_ai_response
     from app.models.store import Store
+    from app.models.integration import StoreIntegration
+    from app.services.shopify_service import ShopifySyncService
 
     parsed_store_uuid = None
     if store_id:
@@ -79,6 +83,22 @@ def run_agent_turn(
             parsed_store_uuid = _uuid_mod.UUID(str(store_id).strip())
         except (ValueError, AttributeError):
             parsed_store_uuid = None
+
+    if parsed_store_uuid is None and shop_domain:
+        try:
+            clean_dom = ShopifySyncService.clean_shop_domain(shop_domain)
+            integration = (
+                db.query(StoreIntegration)
+                .filter(
+                    StoreIntegration.platform == "shopify",
+                    StoreIntegration.shop_domain == clean_dom,
+                )
+                .first()
+            )
+            if integration and integration.store_id:
+                parsed_store_uuid = integration.store_id
+        except Exception:
+            pass
 
     if parsed_store_uuid is None:
         try:

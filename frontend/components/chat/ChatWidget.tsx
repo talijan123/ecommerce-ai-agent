@@ -27,6 +27,7 @@ interface ChatWidgetProps {
   standalone?: boolean;
   embed?: boolean;
   storeId?: string;
+  shopDomain?: string;
   themeColor?: string;
 }
 
@@ -35,6 +36,7 @@ export function ChatWidget({
   standalone = false,
   embed = false,
   storeId,
+  shopDomain,
   themeColor,
 }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(initialOpen || standalone || embed);
@@ -161,7 +163,7 @@ export function ChatWidget({
     setIsLoading(true);
 
     try {
-      const response = await api.sendChatMessage(sessionId, query, customerEmail || undefined, storeId);
+      const response = await api.sendChatMessage(sessionId, query, customerEmail || undefined, storeId, shopDomain);
 
       const assistantMsg: MessageItem = {
 

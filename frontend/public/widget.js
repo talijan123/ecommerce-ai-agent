@@ -12,9 +12,21 @@
   var currentScript =
     document.currentScript ||
     document.querySelector("script[data-store-id]") ||
+    document.querySelector("script[data-shop-domain]") ||
     document.querySelector("script[src*='widget.js']");
 
   var storeId = currentScript ? currentScript.getAttribute("data-store-id") : "";
+  var shopDomain = (currentScript && currentScript.getAttribute("data-shop-domain")) || "";
+
+  // Auto-detect Shopify store domain from global Shopify object or window hostname
+  if (!shopDomain) {
+    if (typeof window.Shopify !== "undefined" && window.Shopify && window.Shopify.shop) {
+      shopDomain = window.Shopify.shop;
+    } else if (window.location && window.location.hostname && window.location.hostname.indexOf(".myshopify.com") !== -1) {
+      shopDomain = window.location.hostname;
+    }
+  }
+
   var themeColor = (currentScript && currentScript.getAttribute("data-theme-color")) || "#4f46e5";
   var position = (currentScript && currentScript.getAttribute("data-position")) || "right"; // right or left
   var customApiUrl = currentScript && currentScript.getAttribute("data-api-url");
@@ -241,6 +253,7 @@
     baseHost +
     "/widget?embed=true" +
     (storeId ? "&store_id=" + encodeURIComponent(storeId) : "") +
+    (shopDomain ? "&shop_domain=" + encodeURIComponent(shopDomain) : "") +
     "&theme_color=" +
     encodeURIComponent(themeColor);
 

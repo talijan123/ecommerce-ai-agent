@@ -48,9 +48,11 @@ class Settings(BaseSettings):
     SHOPIFY_CLIENT_ID: str = Field(default="")
     SHOPIFY_CLIENT_SECRET: str = Field(default="")
     SHOPIFY_API_VERSION: str = Field(default="2024-01")
-    SHOPIFY_SCOPES: str = Field(default="read_products,write_products,read_orders,read_checkouts,read_inventory,write_inventory")
+    SHOPIFY_SCOPES: str = Field(default="read_products,write_products,read_orders,read_checkouts,read_inventory,write_inventory,read_script_tags,write_script_tags")
     SHOPIFY_REDIRECT_URI: str = Field(default="")
     SHOPIFY_APP_EMBED_EXTENSION_ID: str = Field(default="")
+    FRONTEND_URL: str = Field(default="https://ecommerce-store-frontend-swart.vercel.app")
+    WIDGET_JS_URL: str = Field(default="")
 
     # Abandoned Cart Background Worker & Recovery Settings
     RECOVERY_CRON_INTERVAL_MINUTES: int = Field(default=15)
