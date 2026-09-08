@@ -61,3 +61,23 @@ class SyncResultResponse(BaseModel):
     sync_status: str
     message: str
     sample_products: Optional[List[Dict[str, Any]]] = None
+
+
+class DisconnectIntegrationRequest(BaseModel):
+    store_id: str = Field(..., description="Target Store UUID")
+    platform: Optional[str] = Field("shopify", description="Platform identifier (e.g. 'shopify' or 'woocommerce')")
+
+
+class DisconnectResponse(BaseModel):
+    success: bool
+    message: str
+
+
+class ClearCatalogRequest(BaseModel):
+    store_id: str = Field(..., description="Target Store UUID")
+
+
+class ClearCatalogResponse(BaseModel):
+    success: bool
+    message: str
+    deleted_count: int = 0

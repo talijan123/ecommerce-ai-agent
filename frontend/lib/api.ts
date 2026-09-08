@@ -515,6 +515,20 @@ export const api = {
     return res.data;
   },
 
+  async disconnectShopify(storeId: string): Promise<{ success: boolean; message: string }> {
+    const res = await apiClient.post<{ success: boolean; message: string }>("/api/v1/integrations/shopify/disconnect", {
+      store_id: storeId,
+    });
+    return res.data;
+  },
+
+  async clearStoreCatalog(storeId: string): Promise<{ success: boolean; message: string; deleted_count: number }> {
+    const res = await apiClient.post<{ success: boolean; message: string; deleted_count: number }>("/api/v1/integrations/catalog/clear", {
+      store_id: storeId,
+    });
+    return res.data;
+  },
+
   async getStoreIntegrations(storeId: string): Promise<IntegrationResponse[]> {
     const res = await apiClient.get<IntegrationResponse[]>(`/api/v1/integrations/${encodeURIComponent(storeId)}`);
     return res.data;

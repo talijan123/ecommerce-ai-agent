@@ -24,6 +24,10 @@ from app.schemas.integration import (
     SyncStoreRequest,
     IntegrationResponse,
     SyncResultResponse,
+    DisconnectIntegrationRequest,
+    DisconnectResponse,
+    ClearCatalogRequest,
+    ClearCatalogResponse,
 )
 
 from app.services.shopify_service import ShopifySyncService
@@ -425,3 +429,85 @@ def list_store_integrations(
         .all()
     )
     return [i.to_dict() for i in integrations]
+
+
+@router.post(
+    "/shopify/disconnect",
+    response_model=DisconnectResponse,
+    summary="Disconnect Shopify store integration for merchant tenant",
+)
+@router.delete(
+    "/shopify/disconnect",
+    response_model=DisconnectResponse,
+    summary="Disconnect Shopify store integration for merchant tenant",
+)
+def disconnect_shopify(
+    payload: DisconnectIntegrationRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Disconnect a merchant's Shopify store integration:
+    - Verifies store ownership
+    - Deletes StoreIntegration record (clearing credentials & domain association)
+    - Returns confirmation
+    """
+    store = _get_user_store(payload.store_id, db, current_user)
+    integration = (
+        db.query(StoreIntegration)
+        .filter(
+            StoreIntegration.store_id == store.id,
+            StoreIntegration.platform == "shopify",
+        )
+        .first()
+    )
+
+    if integration:
+        db.delete(integration)
+        db.commit()
+
+    return DisconnectResponse(
+        success=True,
+        message="Shopify store disconnected successfully",
+    )
+
+
+@router.post(
+    "/catalog/clear",
+    response_model=ClearCatalogResponse,
+    summary="Wipe all synced products/catalog items for a merchant store tenant",
+)
+@router.delete(
+    "/catalog/clear",
+    response_model=ClearCatalogResponse,
+    summary="Wipe all synced products/catalog items for a merchant store tenant",
+)
+def clear_store_catalog(
+    payload: ClearCatalogRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Clear all synced product catalog records for the authenticated merchant store tenant:
+    - Verifies store ownership
+    - Deletes products belonging to the store
+    - Resets products_synced_count on associated StoreIntegration records
+    - Returns deleted count
+    """
+    store = _get_user_store(payload.store_id, db, current_user)
+    deleted_count = db.query(Product).filter(Product.store_id == store.id).delete(synchronize_session=False)
+
+    # Reset synced counts in any integration records
+    integrations = db.query(StoreIntegration).filter(StoreIntegration.store_id == store.id).all()
+    for item in integrations:
+        item.products_synced_count = 0
+        item.updated_at = datetime.now(timezone.utc)
+
+    db.commit()
+
+    return ClearCatalogResponse(
+        success=True,
+        message="Catalog cleared successfully",
+        deleted_count=deleted_count,
+    )
+

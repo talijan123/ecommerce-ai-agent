@@ -21,6 +21,8 @@ import {
   ShoppingBag,
   Store,
   Upload,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { Header } from "@/components/dashboard/Header";
 import { WebhookSimulator } from "@/components/dashboard/WebhookSimulator";
@@ -40,6 +42,7 @@ export default function CatalogAndOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isClearingCatalog, setIsClearingCatalog] = useState(false);
 
   // Modals
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
@@ -157,6 +160,26 @@ export default function CatalogAndOrdersPage() {
     }, 1200);
   };
 
+  // Clear Store Catalog Handler
+  const handleClearCatalog = async () => {
+    if (!activeStore) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to wipe all catalog products for this store? This cannot be undone."
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsClearingCatalog(true);
+      await api.clearStoreCatalog(activeStore.id);
+      setProducts([]);
+    } catch (err) {
+      console.error("Error clearing catalog:", err);
+    } finally {
+      setIsClearingCatalog(false);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white transition-colors">
       <Header
@@ -218,6 +241,20 @@ export default function CatalogAndOrdersPage() {
 
             {activeTab === "products" && (
               <div className="flex items-center gap-2">
+                {products.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleClearCatalog}
+                    disabled={isClearingCatalog}
+                    className="gap-1.5 text-xs text-rose-600 dark:text-rose-400 border-rose-500/30 hover:bg-rose-500/10 min-h-[38px] shrink-0 font-semibold"
+                    title="Wipe all catalog products"
+                  >
+                    <Trash2 className={`h-3.5 w-3.5 ${isClearingCatalog ? "animate-spin" : ""}`} />
+                    <span>{isClearingCatalog ? "Clearing..." : "Clear Catalog"}</span>
+                  </Button>
+                )}
+
                 <Button
                   variant="outline"
                   size="sm"

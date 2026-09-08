@@ -26,6 +26,8 @@ import {
   Globe,
   HelpCircle,
   ChevronDown,
+  Trash2,
+  Unlink,
 } from "lucide-react";
 import { Header } from "@/components/dashboard/Header";
 import { ShopifyConnectModal } from "@/components/dashboard/ShopifyConnectModal";
@@ -50,6 +52,8 @@ export default function IntegrationsPage() {
   const [syncingPlatform, setSyncingPlatform] = useState<string | null>(null);
   const [shopifyDomainInput, setShopifyDomainInput] = useState<string>("yqcncc-b0.myshopify.com");
   const [isConnectingShopify, setIsConnectingShopify] = useState<boolean>(false);
+  const [isDisconnectingShopify, setIsDisconnectingShopify] = useState<boolean>(false);
+  const [isClearingCatalog, setIsClearingCatalog] = useState<boolean>(false);
 
   // Reactive state for platform connections and store info
   const [shopifyConnected, setShopifyConnected] = useState<boolean>(false);
@@ -484,6 +488,69 @@ export default function IntegrationsPage() {
     }
   };
 
+  // Disconnect Shopify Integration Mutation
+  const handleDisconnectShopify = async () => {
+    if (!activeStoreId) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to disconnect this store? Your AI assistant will stop serving storefront queries until reconnected."
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsDisconnectingShopify(true);
+      await api.disconnectShopify(activeStoreId);
+
+      // Reset local state immediately
+      setShopifyConnected(false);
+      setShopifySyncStatus("disconnected");
+      setShopifyStoreInfo(null);
+      setIntegrations((prev) => prev.filter((i) => i.platform !== "shopify"));
+
+      showToast(
+        "success",
+        "Shopify Disconnected",
+        "Your Shopify store integration has been successfully disconnected."
+      );
+
+      await loadStoreIntegrations(activeStoreId);
+    } catch (err: any) {
+      showToast("error", "Disconnect Failed", formatApiError(err));
+    } finally {
+      setIsDisconnectingShopify(false);
+    }
+  };
+
+  // Clear Store Catalog Mutation
+  const handleClearCatalog = async () => {
+    if (!activeStoreId) return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to wipe all catalog products for this store? This cannot be undone."
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsClearingCatalog(true);
+      const res = await api.clearStoreCatalog(activeStoreId);
+
+      setProducts([]);
+      setShopifyStoreInfo((prev) => (prev ? { ...prev, productCount: 0 } : null));
+
+      showToast(
+        "success",
+        "Catalog Cleared",
+        `Successfully removed ${res.deleted_count ?? 0} products from this store catalog.`
+      );
+
+      await loadStoreIntegrations(activeStoreId);
+    } catch (err: any) {
+      showToast("error", "Clear Catalog Failed", formatApiError(err));
+    } finally {
+      setIsClearingCatalog(false);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-fade-in max-w-7xl mx-auto pb-12">
       {/* Toast Notification Banner */}
@@ -561,6 +628,19 @@ export default function IntegrationsPage() {
             <Zap className="h-4 w-4 text-amber-500" />
             <span>{(isShopifyConnected ? 1 : 0) + (isWooConnected ? 1 : 0)} Active Feeds</span>
           </div>
+          {products.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearCatalog}
+              disabled={isClearingCatalog || loading}
+              className="text-xs rounded-xl border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/50 transition-colors"
+              title="Wipe all synced catalog items"
+            >
+              <Trash2 className={`h-3.5 w-3.5 mr-1.5 ${isClearingCatalog ? "animate-spin" : ""}`} />
+              {isClearingCatalog ? "Clearing..." : "Clear Catalog"}
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -746,7 +826,7 @@ export default function IntegrationsPage() {
                     size="sm"
                     className="flex-1 rounded-2xl min-h-[42px] font-semibold text-xs border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 shadow-sm"
                     onClick={handleReSyncShopify}
-                    disabled={syncingPlatform === "shopify"}
+                    disabled={syncingPlatform === "shopify" || isDisconnectingShopify}
                   >
                     <RefreshCw
                       className={`h-4 w-4 mr-2 ${
@@ -760,8 +840,28 @@ export default function IntegrationsPage() {
                     size="sm"
                     className="rounded-2xl min-h-[42px] font-semibold text-xs border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                     onClick={() => setIsShopifyModalOpen(true)}
+                    disabled={isDisconnectingShopify}
                   >
                     Change Domain
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-2xl min-h-[42px] font-semibold text-xs border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/50 shadow-sm transition-colors"
+                    onClick={handleDisconnectShopify}
+                    disabled={isDisconnectingShopify || syncingPlatform === "shopify"}
+                  >
+                    {isDisconnectingShopify ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                        <span>Disconnecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Unlink className="h-4 w-4 mr-1.5" />
+                        <span>Disconnect Store</span>
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>

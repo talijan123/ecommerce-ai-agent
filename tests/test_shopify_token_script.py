@@ -277,3 +277,85 @@ def test_shopify_connect_endpoint_with_client_credentials():
         assert data["products_synced_count"] >= 5
     finally:
         db.close()
+
+
+def test_shopify_disconnect_and_clear_catalog_endpoints():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.core.security import create_access_token
+    from app.models.user import User
+
+    client = TestClient(app)
+    ensure_db_initialized()
+    db = SessionLocal()
+
+    store = None
+    try:
+        user = db.query(User).first()
+        assert user is not None
+
+        # Create temporary store
+        store = Store(
+            owner_id=user.id,
+            owner_email=user.email,
+            name="Disconnect Test Store",
+            whatsapp_phone_number_id=f"test_phone_{uuid.uuid4().hex[:8]}",
+            is_active=True,
+        )
+        db.add(store)
+        db.commit()
+        db.refresh(store)
+
+        token = create_access_token({"sub": str(user.id), "email": str(user.email)})
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # 1. Create Shopify StoreIntegration record
+        integ = StoreIntegration(
+            store_id=store.id,
+            platform="shopify",
+            shop_domain="temp-disconnect-store.myshopify.com",
+            access_token="shpat_temp_token_123",
+            sync_status="connected",
+            products_synced_count=2,
+        )
+        db.add(integ)
+        db.commit()
+
+        # Verify integration exists
+        integ_check = db.query(StoreIntegration).filter(StoreIntegration.store_id == store.id, StoreIntegration.platform == "shopify").first()
+        assert integ_check is not None
+
+        # 2. Add dummy products
+        p1 = Product(store_id=store.id, sku=f"SKU-DISC-1-{uuid.uuid4().hex[:6]}", title="Item 1", category="Apparel", price=29.99, stock_quantity=10)
+        p2 = Product(store_id=store.id, sku=f"SKU-DISC-2-{uuid.uuid4().hex[:6]}", title="Item 2", category="Apparel", price=49.99, stock_quantity=20)
+        db.add_all([p1, p2])
+        db.commit()
+
+        # 3. Test Clear Catalog endpoint (POST and DELETE)
+        clear_resp = client.post("/api/v1/integrations/catalog/clear", json={"store_id": str(store.id)}, headers=headers)
+        assert clear_resp.status_code == 200
+        clear_data = clear_resp.json()
+        assert clear_data["success"] is True
+        assert clear_data["deleted_count"] >= 2
+
+        # Verify products wiped
+        prods_remaining = db.query(Product).filter(Product.store_id == store.id).all()
+        assert len(prods_remaining) == 0
+
+        # 4. Test Disconnect Shopify endpoint (POST and DELETE)
+        disc_resp = client.post("/api/v1/integrations/shopify/disconnect", json={"store_id": str(store.id)}, headers=headers)
+        assert disc_resp.status_code == 200
+        disc_data = disc_resp.json()
+        assert disc_data["success"] is True
+
+        # Verify integration removed
+        integ_after = db.query(StoreIntegration).filter(StoreIntegration.store_id == store.id, StoreIntegration.platform == "shopify").first()
+        assert integ_after is None
+
+    finally:
+        if store:
+            db.query(Product).filter(Product.store_id == store.id).delete()
+            db.query(StoreIntegration).filter(StoreIntegration.store_id == store.id).delete()
+            db.query(Store).filter(Store.id == store.id).delete()
+            db.commit()
+        db.close()
