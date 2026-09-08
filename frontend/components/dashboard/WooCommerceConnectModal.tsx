@@ -91,8 +91,8 @@ export function WooCommerceConnectModal({
             <div>
               <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                 Connect WooCommerce Store
-                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                  REST API
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                  Coming Soon (Private Preview)
                 </span>
               </h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">

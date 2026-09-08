@@ -312,14 +312,21 @@ export default function CatalogAndOrdersPage() {
                     </button>
 
                     <button
-                      onClick={() => setIsWooCommerceModalOpen(true)}
-                      className="p-4 rounded-2xl border border-indigo-500/30 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-800 dark:text-indigo-300 transition-all flex flex-col items-center justify-center gap-2 group text-center"
+                      disabled
+                      aria-disabled="true"
+                      title="WooCommerce integration is currently in private preview (Coming Soon)"
+                      className="p-4 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-800 bg-zinc-100/50 dark:bg-zinc-900/30 text-zinc-400 dark:text-zinc-500 transition-all flex flex-col items-center justify-center gap-2 text-center cursor-not-allowed opacity-75 relative overflow-hidden group"
                     >
-                      <div className="h-10 w-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                      <div className="absolute top-2.5 right-2.5">
+                        <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700">
+                          Coming Soon
+                        </span>
+                      </div>
+                      <div className="h-10 w-10 rounded-xl bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 flex items-center justify-center shadow-sm">
                         <Store className="h-5 w-5" />
                       </div>
-                      <span className="text-xs font-bold">WooCommerce</span>
-                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400">REST API Sync</span>
+                      <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400">WooCommerce</span>
+                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500">REST API (Preview)</span>
                     </button>
 
                     <button

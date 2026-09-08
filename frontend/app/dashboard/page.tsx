@@ -87,6 +87,7 @@ export default function DashboardOverviewPage() {
   // Catalog Table Search & Filter
   const [catalogSearch, setCatalogSearch] = useState("");
   const [catalogCategory, setCatalogCategory] = useState("All");
+  const [selectedChannel, setSelectedChannel] = useState<"all" | "shopify">("all");
 
   // Load catalog strictly for the selected tenant store
   const loadStoreCatalog = useCallback(async (storeId: string) => {
@@ -299,6 +300,67 @@ export default function DashboardOverviewPage() {
               <ShoppingBag className="h-3.5 w-3.5" />
               <span>Shopify Sync</span>
             </Button>
+          </div>
+        </div>
+
+        {/* Channel & Integration Filter Bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2.5 rounded-2xl bg-white/80 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 shadow-sm backdrop-blur-md">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider px-2">
+              Channel:
+            </span>
+
+            {/* All Channels Tab */}
+            <button
+              onClick={() => setSelectedChannel("all")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                selectedChannel === "all"
+                  ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/60"
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5" />
+              <span>All Channels</span>
+            </button>
+
+            {/* Shopify Tab (Active & Default Live) */}
+            <button
+              onClick={() => setSelectedChannel("shopify")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                selectedChannel === "shopify"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-500/10"
+              }`}
+            >
+              <ShoppingBag className="h-3.5 w-3.5" />
+              <span>Shopify</span>
+              <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full border ${
+                selectedChannel === "shopify"
+                  ? "bg-emerald-700/50 text-emerald-100 border-emerald-400/30"
+                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+              }`}>
+                Live
+              </span>
+            </button>
+
+            {/* WooCommerce Tab (Disabled with Coming Soon Badge) */}
+            <button
+              disabled
+              aria-disabled="true"
+              title="WooCommerce integration is currently in private preview (Coming Soon)"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 text-zinc-400 dark:text-zinc-500 cursor-not-allowed opacity-60 bg-zinc-100/50 dark:bg-zinc-800/30 border border-dashed border-zinc-200 dark:border-zinc-800"
+            >
+              <Store className="h-3.5 w-3.5 opacity-60" />
+              <span>WooCommerce</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700">
+                Coming Soon
+              </span>
+            </button>
+          </div>
+
+          <div className="text-[11px] text-zinc-500 dark:text-zinc-400 px-2 flex items-center gap-1.5 justify-end">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-medium">Primary Store: <strong className="text-zinc-700 dark:text-zinc-200 font-bold">Shopify Live</strong></span>
           </div>
         </div>
 
@@ -563,6 +625,57 @@ export default function DashboardOverviewPage() {
           </Card>
         </div>
 
+        {/* Platform & Channel Performance Attribution Breakdown */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Shopify Channel Card (Live & Active) */}
+          <Card className="p-4 sm:p-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/15 shadow-sm flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="h-11 w-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20 shrink-0">
+                <ShoppingBag className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-sm text-zinc-900 dark:text-white">Shopify Integration</span>
+                  <Badge variant="success" dot={true} className="text-[9px] py-0 px-2 font-mono">
+                    Live Channel
+                  </Badge>
+                </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">
+                  Live inventory lookup, SKU variant syncing, and cart recovery
+                </p>
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              <span className="text-[10px] text-zinc-400 uppercase font-bold block">Attribution</span>
+              <span className="font-black text-xs sm:text-sm text-emerald-600 dark:text-emerald-400">100% Active</span>
+            </div>
+          </Card>
+
+          {/* WooCommerce Channel Card (Coming Soon & Disabled) */}
+          <Card className="p-4 sm:p-5 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 bg-zinc-100/40 dark:bg-zinc-900/30 opacity-75 relative overflow-hidden flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="h-11 w-11 rounded-2xl bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 flex items-center justify-center shrink-0">
+                <Store className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-sm text-zinc-600 dark:text-zinc-400">WooCommerce</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700">
+                    Coming Soon
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">
+                  REST API synchronization is currently in private preview
+                </p>
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              <span className="text-[10px] text-zinc-400 uppercase font-bold block">Status</span>
+              <span className="font-bold text-xs text-zinc-400 dark:text-zinc-500">Inactive</span>
+            </div>
+          </Card>
+        </div>
+
         {/* Catalog Section: Empty State OR Live Product Table */}
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -642,14 +755,21 @@ export default function DashboardOverviewPage() {
                   </button>
 
                   <button
-                    onClick={() => setIsWooCommerceModalOpen(true)}
-                    className="p-4 rounded-2xl border border-indigo-500/30 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-800 dark:text-indigo-300 transition-all flex flex-col items-center justify-center gap-2 group text-center"
+                    disabled
+                    aria-disabled="true"
+                    title="WooCommerce integration is currently in private preview (Coming Soon)"
+                    className="p-4 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-800 bg-zinc-100/50 dark:bg-zinc-900/30 text-zinc-400 dark:text-zinc-500 transition-all flex flex-col items-center justify-center gap-2 text-center cursor-not-allowed opacity-75 relative overflow-hidden group"
                   >
-                    <div className="h-10 w-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+                    <div className="absolute top-2.5 right-2.5">
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700">
+                        Coming Soon
+                      </span>
+                    </div>
+                    <div className="h-10 w-10 rounded-xl bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 flex items-center justify-center shadow-sm">
                       <Store className="h-5 w-5" />
                     </div>
-                    <span className="text-xs font-bold">WooCommerce</span>
-                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400">REST API Sync</span>
+                    <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400">WooCommerce</span>
+                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500">REST API (Preview)</span>
                   </button>
 
                   <button
