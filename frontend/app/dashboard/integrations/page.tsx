@@ -51,6 +51,22 @@ export default function IntegrationsPage() {
   const [shopifyDomainInput, setShopifyDomainInput] = useState<string>("yqcncc-b0.myshopify.com");
   const [isConnectingShopify, setIsConnectingShopify] = useState<boolean>(false);
 
+  // Reactive state for platform connections and store info
+  const [shopifyConnected, setShopifyConnected] = useState<boolean>(false);
+  const [shopifySyncStatus, setShopifySyncStatus] = useState<string>("disconnected");
+  const [shopifyStoreInfo, setShopifyStoreInfo] = useState<{
+    domain: string;
+    productCount: number;
+    lastSyncedAt?: string;
+  } | null>(null);
+
+  const [wooConnected, setWooConnected] = useState<boolean>(false);
+  const [wooStoreInfo, setWooStoreInfo] = useState<{
+    domain: string;
+    productCount: number;
+    lastSyncedAt?: string;
+  } | null>(null);
+
   // Modals
   const [isShopifyModalOpen, setIsShopifyModalOpen] = useState(false);
   const [isWooCommerceModalOpen, setIsWooCommerceModalOpen] = useState(false);
@@ -85,19 +101,55 @@ export default function IntegrationsPage() {
         api.getStoreIntegrations(storeId).catch(() => []),
         api.getStoreProducts(storeId).catch(() => []),
       ]);
-      setIntegrations((prev) => {
-        if (!integrationsData || integrationsData.length === 0) {
-          return prev;
-        }
-        const merged = [...integrationsData];
-        for (const item of prev) {
-          if (!merged.some((m) => m.platform === item.platform)) {
-            merged.push(item);
+
+      if (Array.isArray(integrationsData)) {
+        setIntegrations(integrationsData);
+
+        // Sync Shopify reactive state
+        const shopify = integrationsData.find((i) => i.platform === "shopify");
+        if (
+          shopify &&
+          (shopify.sync_status === "connected" ||
+            Boolean(shopify.shop_domain) ||
+            (shopify.products_synced_count ?? 0) > 0)
+        ) {
+          setShopifyConnected(true);
+          setShopifySyncStatus(shopify.sync_status || "connected");
+          setShopifyStoreInfo({
+            domain: shopify.shop_domain || "",
+            productCount: shopify.products_synced_count ?? 0,
+            lastSyncedAt: shopify.last_synced_at || shopify.updated_at || undefined,
+          });
+          if (shopify.shop_domain) {
+            setShopifyDomainInput(shopify.shop_domain);
           }
+        } else {
+          setShopifyConnected(false);
+          setShopifySyncStatus("disconnected");
+          setShopifyStoreInfo(null);
         }
-        return merged;
-      });
-      if (productsData && productsData.length > 0) {
+
+        // Sync WooCommerce reactive state
+        const woo = integrationsData.find((i) => i.platform === "woocommerce");
+        if (
+          woo &&
+          (woo.sync_status === "connected" ||
+            Boolean(woo.shop_domain) ||
+            (woo.products_synced_count ?? 0) > 0)
+        ) {
+          setWooConnected(true);
+          setWooStoreInfo({
+            domain: woo.shop_domain || "",
+            productCount: woo.products_synced_count ?? 0,
+            lastSyncedAt: woo.last_synced_at || woo.updated_at || undefined,
+          });
+        } else {
+          setWooConnected(false);
+          setWooStoreInfo(null);
+        }
+      }
+
+      if (Array.isArray(productsData)) {
         setProducts(productsData);
       }
     } catch (err) {
@@ -142,11 +194,25 @@ export default function IntegrationsPage() {
   const wooIntegration = integrations.find((i) => i.platform === "woocommerce");
 
   const isShopifyConnected =
+    shopifyConnected ||
+    shopifySyncStatus === "connected" ||
     shopifyIntegration?.sync_status === "connected" ||
     (shopifyIntegration?.products_synced_count ?? 0) > 0 ||
     Boolean(shopifyIntegration?.shop_domain);
 
+  const shopifyDomain =
+    shopifyStoreInfo?.domain ||
+    shopifyIntegration?.shop_domain ||
+    shopifyDomainInput ||
+    "myshopify.com";
+
+  const syncedShopifyProductCount =
+    shopifyStoreInfo?.productCount ??
+    shopifyIntegration?.products_synced_count ??
+    products.length;
+
   const isWooConnected =
+    wooConnected ||
     wooIntegration?.sync_status === "connected" ||
     (wooIntegration?.products_synced_count ?? 0) > 0 ||
     Boolean(wooIntegration?.shop_domain);
@@ -176,10 +242,27 @@ export default function IntegrationsPage() {
 
   // Immediate optimistic update when Shopify connects/syncs
   const handleShopifySuccess = (result?: IntegrationResponse) => {
-    const domain = result?.shop_domain || shopifyIntegration?.shop_domain || `${activeStore?.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.myshopify.com`;
-    const count = result?.products_synced_count !== undefined ? result.products_synced_count : 2;
+    const domain =
+      result?.shop_domain ||
+      shopifyDomainInput.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "") ||
+      shopifyIntegration?.shop_domain ||
+      `${activeStore?.name.toLowerCase().replace(/[^a-z0-9]/g, "") || "my-brand"}.myshopify.com`;
+    const count =
+      result?.products_synced_count !== undefined
+        ? result.products_synced_count
+        : (shopifyStoreInfo?.productCount ?? products.length ?? 2);
 
-    // 1. Instant Optimistic State Update
+    // 1. Instant local reactive state updates
+    setShopifyConnected(true);
+    setShopifySyncStatus("connected");
+    setShopifyStoreInfo({
+      domain,
+      productCount: count,
+      lastSyncedAt: new Date().toISOString(),
+    });
+    setShopifyDomainInput(domain);
+
+    // 2. Instant Optimistic State Update in integrations array
     setIntegrations((prev) => {
       const filtered = prev.filter((i) => i.platform !== "shopify");
       const updated: IntegrationResponse = {
@@ -196,17 +279,17 @@ export default function IntegrationsPage() {
       return [updated, ...filtered];
     });
 
-    // 2. Mark Last Synced as Just now
+    // 3. Mark Last Synced as Just now
     setLastSyncTimes((prev) => ({ ...prev, shopify: "Just now" }));
 
-    // 3. Instant Toast Alert
+    // 4. Instant Toast Alert
     showToast(
       "success",
       "Shopify Connected Successfully!",
       `Live catalog connected for ${domain}. ${count} products synchronized into catalog.`
     );
 
-    // 4. Background re-fetch of server state to ensure fresh data
+    // 5. Background re-fetch of server state to ensure fresh data
     if (activeStoreId) {
       loadStoreIntegrations(activeStoreId);
     }
@@ -229,6 +312,16 @@ export default function IntegrationsPage() {
         store_id: activeStoreId,
         shop_domain: cleanDomain,
       });
+
+      // Immediate reactive local state updates
+      setShopifyConnected(true);
+      setShopifySyncStatus("connected");
+      setShopifyStoreInfo({
+        domain: result.shop_domain || cleanDomain,
+        productCount: result.products_synced_count ?? 2,
+        lastSyncedAt: new Date().toISOString(),
+      });
+
       handleShopifySuccess(result);
     } catch (err: any) {
       showToast("error", "Connection Failed", formatApiError(err));
@@ -241,6 +334,13 @@ export default function IntegrationsPage() {
   const handleWooCommerceSuccess = (result?: any) => {
     const domain = result?.shop_domain || wooIntegration?.shop_domain || `https://${activeStore?.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`;
     const count = result?.products_synced !== undefined ? result.products_synced : (wooIntegration?.products_synced_count || 5);
+
+    setWooConnected(true);
+    setWooStoreInfo({
+      domain,
+      productCount: count,
+      lastSyncedAt: new Date().toISOString(),
+    });
 
     setIntegrations((prev) => {
       const filtered = prev.filter((i) => i.platform !== "woocommerce");
@@ -278,31 +378,59 @@ export default function IntegrationsPage() {
       setSyncingPlatform("shopify");
       const syncResult = await api.syncShopify(activeStoreId, false);
       const syncedCount = syncResult.products_synced ?? 0;
+      const currentDomain = shopifyStoreInfo?.domain || shopifyIntegration?.shop_domain || shopifyDomainInput;
 
-      // Update local state reactively
-      setIntegrations((prev) =>
-        prev.map((item) =>
-          item.platform === "shopify"
-            ? {
-                ...item,
-                sync_status: "connected",
-                products_synced_count: syncedCount,
-                last_synced_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              }
-            : item
-        )
-      );
+      // Update local state reactively immediately
+      setShopifyConnected(true);
+      setShopifySyncStatus("connected");
+      setShopifyStoreInfo((prev) => ({
+        domain: prev?.domain || currentDomain,
+        productCount: syncedCount,
+        lastSyncedAt: new Date().toISOString(),
+      }));
+
+      // Update integrations list reactively
+      setIntegrations((prev) => {
+        const existing = prev.find((i) => i.platform === "shopify");
+        if (existing) {
+          return prev.map((item) =>
+            item.platform === "shopify"
+              ? {
+                  ...item,
+                  sync_status: "connected",
+                  products_synced_count: syncedCount,
+                  last_synced_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                }
+              : item
+          );
+        } else {
+          return [
+            {
+              id: `shopify-${Date.now()}`,
+              store_id: activeStoreId,
+              platform: "shopify",
+              shop_domain: currentDomain,
+              sync_status: "connected",
+              products_synced_count: syncedCount,
+              last_synced_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+            ...prev,
+          ];
+        }
+      });
 
       setLastSyncTimes((prev) => ({ ...prev, shopify: "Just now" }));
 
       showToast(
         "success",
         "Shopify Catalog Synced",
-        `Successfully re-synced ${syncedCount} products from ${shopifyIntegration?.shop_domain || "Shopify"}.`
+        `Successfully re-synced ${syncedCount} products from ${currentDomain || "Shopify"}.`
       );
 
-      // Re-fetch products to update catalog count
+      // Re-fetch products & store integrations to update catalog count
       await loadStoreIntegrations(activeStoreId);
     } catch (err: any) {
       showToast("error", "Sync Failed", formatApiError(err));
@@ -318,6 +446,13 @@ export default function IntegrationsPage() {
       setSyncingPlatform("woocommerce");
       const syncResult = await api.syncWooCommerce(activeStoreId);
       const syncedCount = syncResult.products_synced ?? 0;
+
+      setWooConnected(true);
+      setWooStoreInfo((prev) => ({
+        domain: prev?.domain || wooIntegration?.shop_domain || "",
+        productCount: syncedCount,
+        lastSyncedAt: new Date().toISOString(),
+      }));
 
       setIntegrations((prev) =>
         prev.map((item) =>
@@ -469,17 +604,25 @@ export default function IntegrationsPage() {
                 </div>
               </div>
 
-              {/* Reactive Status Badge */}
-              {isShopifyConnected ? (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-in fade-in duration-300 shadow-sm shadow-emerald-500/10">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>● Connected</span>
-                </div>
-              ) : (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
-                  Not Connected
-                </div>
-              )}
+              {/* Reactive Status Badge & Product Count */}
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                {isShopifyConnected ? (
+                  <>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-in fade-in duration-300 shadow-sm shadow-emerald-500/10">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>● Connected: {shopifyDomain}</span>
+                    </div>
+                    <div className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
+                      <PackageCheck className="h-3.5 w-3.5 text-emerald-500" />
+                      <span>{syncedShopifyProductCount} Synced</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+                    Not Connected
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* If NOT connected: Show single clean Domain Input & Connect Button */}
@@ -534,14 +677,14 @@ export default function IntegrationsPage() {
                     <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
                       <Globe className="h-3.5 w-3.5 text-emerald-500" /> Connected Domain
                     </span>
-                    {shopifyIntegration?.shop_domain ? (
+                    {shopifyDomain ? (
                       <a
-                        href={`https://${shopifyIntegration.shop_domain}`}
+                        href={`https://${shopifyDomain}`}
                         target="_blank"
                         rel="noreferrer"
                         className="font-mono font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline bg-emerald-500/10 dark:bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/20"
                       >
-                        {shopifyIntegration.shop_domain}
+                        {shopifyDomain}
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     ) : (
@@ -554,7 +697,7 @@ export default function IntegrationsPage() {
                       <PackageCheck className="h-3.5 w-3.5 text-emerald-500" /> Synced Catalog
                     </span>
                     <span className="font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-                      {shopifyIntegration?.products_synced_count ?? 0} Products Synced
+                      {syncedShopifyProductCount} Products Synced
                     </span>
                   </div>
 
@@ -563,7 +706,7 @@ export default function IntegrationsPage() {
                       <Clock className="h-3.5 w-3.5 text-zinc-400" /> Last Synchronized
                     </span>
                     <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                      {formatSyncTime("shopify", shopifyIntegration?.last_synced_at || shopifyIntegration?.updated_at)}
+                      {formatSyncTime("shopify", shopifyStoreInfo?.lastSyncedAt || shopifyIntegration?.last_synced_at || shopifyIntegration?.updated_at)}
                     </span>
                   </div>
                 </div>
@@ -585,7 +728,7 @@ export default function IntegrationsPage() {
                     Opens your Shopify theme editor with the AI Assistant app embed ready to toggle on.
                   </p>
                   <a
-                    href={`https://${(shopifyIntegration?.shop_domain || activeStore?.name || "my-brand.myshopify.com").replace(/^https?:\/\//i, "").replace(/\/+$/, "")}/admin/themes/current/editor?context=apps`}
+                    href={`https://${(shopifyDomain || activeStore?.name || "my-brand.myshopify.com").replace(/^https?:\/\//i, "").replace(/\/+$/, "")}/admin/themes/current/editor?context=apps`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
