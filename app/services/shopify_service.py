@@ -16,6 +16,7 @@ from sqlalchemy import or_
 
 from app.models.product import Product
 from app.models.integration import StoreIntegration
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -108,12 +109,90 @@ class ShopifySyncService:
         """Normalize store domain to standard format (e.g. store.myshopify.com)."""
         if not shop_domain:
             return ""
-        clean = shop_domain.strip().lower()
+        clean = str(shop_domain).strip().lower()
         clean = re.sub(r"^https?://", "", clean)
         clean = clean.rstrip("/")
+        if "/" in clean:
+            clean = clean.split("/")[0]
         if clean and not clean.endswith(".myshopify.com") and "." not in clean:
             clean = f"{clean}.myshopify.com"
         return clean
+
+    @classmethod
+    def extract_shop_name(cls, shop_domain: str) -> str:
+        """Extract clean store name without .myshopify.com (e.g. 'mystore' from 'mystore.myshopify.com')."""
+        clean = cls.clean_shop_domain(shop_domain)
+        if clean.endswith(".myshopify.com"):
+            return clean[:-len(".myshopify.com")]
+        return clean.split(".")[0]
+
+    @classmethod
+    def sanitize_scopes(cls, scopes: Optional[str] = None) -> str:
+        """Ensure SCOPES string is comma-separated without illegal characters or extra whitespace."""
+        if not scopes:
+            scopes = getattr(settings, "SHOPIFY_SCOPES", "read_products,write_products,read_orders,read_checkouts,read_inventory,write_inventory")
+        scope_list = [re.sub(r"[^a-zA-Z0-9_\-]", "", s.strip()) for s in re.split(r"[,\s]+", str(scopes)) if s.strip()]
+        return ",".join(dict.fromkeys(scope_list)) or "read_products,write_products,read_orders,read_checkouts"
+
+    @classmethod
+    def build_authorization_url(
+        cls,
+        shop_domain: str,
+        client_id: Optional[str] = None,
+        redirect_uri: Optional[str] = None,
+        scopes: Optional[str] = None,
+        state: Optional[str] = None,
+    ) -> str:
+        """
+        Construct standard Shopify OAuth Authorization URL strictly adhering to:
+        https://{clean_shop_domain}/admin/oauth/authorize?client_id={SHOPIFY_CLIENT_ID}&scope={SCOPES}&redirect_uri={SHOPIFY_REDIRECT_URI}&state={STATE}
+
+        DO NOT prefix with admin.shopify.com/store/ for initial OAuth handshake.
+        It must target {shop}.myshopify.com/admin/oauth/authorize.
+        """
+        clean_domain = cls.clean_shop_domain(shop_domain)
+        if not clean_domain:
+            raise ValueError("Invalid Shopify store domain.")
+
+        cid = (client_id or getattr(settings, "SHOPIFY_CLIENT_ID", "") or "").strip()
+        sanitized_scopes = cls.sanitize_scopes(scopes or getattr(settings, "SHOPIFY_SCOPES", None))
+        r_uri = (redirect_uri or getattr(settings, "SHOPIFY_REDIRECT_URI", "") or "").strip()
+        st = (state or uuid.uuid4().hex).strip()
+
+        import urllib.parse
+        params = {
+            "client_id": cid,
+            "scope": sanitized_scopes,
+        }
+        if r_uri:
+            params["redirect_uri"] = r_uri
+        if st:
+            params["state"] = st
+
+        query_string = urllib.parse.urlencode(params)
+        return f"https://{clean_domain}/admin/oauth/authorize?{query_string}"
+
+    @classmethod
+    def build_theme_embed_deep_link(
+        cls,
+        shop_domain: str,
+        app_embed_extension_id: Optional[str] = None,
+    ) -> str:
+        """
+        Construct 1-Click Shopify Theme Customizer deep link.
+        Format:
+        https://admin.shopify.com/store/{shop_name_without_myshopify}/themes/current/editor?context=apps&activateAppId={app_embed_extension_id}/app-embed
+        Fallback:
+        https://{clean_shop_domain}/admin/themes/current/editor?context=apps
+        """
+        clean_domain = cls.clean_shop_domain(shop_domain)
+        shop_name = cls.extract_shop_name(clean_domain)
+        embed_id = (app_embed_extension_id or getattr(settings, "SHOPIFY_APP_EMBED_EXTENSION_ID", "") or "").strip()
+        if embed_id and shop_name:
+            if not embed_id.endswith("/app-embed"):
+                embed_id = f"{embed_id}/app-embed"
+            return f"https://admin.shopify.com/store/{shop_name}/themes/current/editor?context=apps&activateAppId={embed_id}"
+        return f"https://{clean_domain}/admin/themes/current/editor?context=apps"
 
     @classmethod
     def strip_html(cls, raw_html: Optional[str]) -> str:

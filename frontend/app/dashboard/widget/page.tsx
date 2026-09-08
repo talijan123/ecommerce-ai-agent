@@ -161,7 +161,20 @@ export default function WidgetDashboardPage() {
       return;
     }
     const cleanDomain = domain.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
-    window.open(`https://${cleanDomain}/admin/themes/current/editor?context=apps`, "_blank", "noopener,noreferrer");
+    const shopName = cleanDomain.endsWith(".myshopify.com")
+      ? cleanDomain.slice(0, -".myshopify.com".length)
+      : cleanDomain.split(".")[0];
+    const appEmbedId = (process.env.NEXT_PUBLIC_SHOPIFY_APP_EMBED_EXTENSION_ID || "").trim();
+
+    let deepLink: string;
+    if (appEmbedId && shopName) {
+      const formattedEmbedId = appEmbedId.endsWith("/app-embed") ? appEmbedId : `${appEmbedId}/app-embed`;
+      deepLink = `https://admin.shopify.com/store/${shopName}/themes/current/editor?context=apps&activateAppId=${formattedEmbedId}`;
+    } else {
+      deepLink = `https://${cleanDomain}/admin/themes/current/editor?context=apps`;
+    }
+
+    window.open(deepLink, "_blank", "noopener,noreferrer");
   };
 
   return (

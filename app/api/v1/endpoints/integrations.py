@@ -238,6 +238,45 @@ def connect_shopify(
     return integration.to_dict()
 
 
+@router.get(
+    "/shopify/authorize-url",
+    summary="Generate standardized Shopify OAuth Authorization URL",
+)
+def get_shopify_authorize_url(
+    store_id: str,
+    shop_domain: str,
+    redirect_uri: Optional[str] = None,
+    state: Optional[str] = None,
+    scopes: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate the official Shopify OAuth authorization URL to prevent 'switch account' redirect loops.
+    Strict format:
+    https://{clean_shop_domain}/admin/oauth/authorize?client_id={SHOPIFY_CLIENT_ID}&scope={SCOPES}&redirect_uri={SHOPIFY_REDIRECT_URI}&state={STATE}
+    """
+    store = _get_user_store(store_id, db, current_user)
+    clean_domain = ShopifySyncService.clean_shop_domain(shop_domain)
+    if not clean_domain:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Shopify store domain. Please provide a valid domain (e.g. store-name.myshopify.com).",
+        )
+
+    auth_url = ShopifySyncService.build_authorization_url(
+        shop_domain=clean_domain,
+        client_id=settings.SHOPIFY_CLIENT_ID,
+        redirect_uri=redirect_uri or settings.SHOPIFY_REDIRECT_URI,
+        scopes=scopes or settings.SHOPIFY_SCOPES,
+        state=state or str(store.id),
+    )
+    return {
+        "shop_domain": clean_domain,
+        "authorize_url": auth_url,
+    }
+
+
 @router.post(
     "/shopify/sync",
     response_model=SyncResultResponse,
