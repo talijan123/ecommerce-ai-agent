@@ -265,7 +265,13 @@ def sync_shopify_catalog(
         .first()
     )
 
-    domain = integration.shop_domain if integration and integration.shop_domain else f"{store.name.lower().replace(' ', '-')}.myshopify.com"
+    if not integration or not integration.shop_domain:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Shopify store is not connected. Please connect your Shopify store first.",
+        )
+
+    domain = integration.shop_domain
     token = integration.access_token if integration and integration.access_token else None
 
     result = ShopifySyncService.fetch_and_ingest_products(
@@ -289,34 +295,34 @@ def connect_woocommerce(
     db: Session = Depends(get_db),
 ):
     """
-    Connect a merchant's WooCommerce store with REST credentials.
-    - Normalizes store URL
-    - Verifies credentials against WooCommerce REST API (/wp-json/wc/v3/system_status)
+    Connect a merchant's WooCommerce store:
+    - Normalizes store base URL (e.g. https://my-store.com)
+    - Verifies REST credentials against /wp-json/wc/v3/system_status
+    - Ingests products immediately upon connection
     - Saves or updates StoreIntegration record
-    - Triggers immediate product catalog ingestion
     """
     store = _get_user_store(payload.store_id, db, current_user)
-    raw_url = payload.store_url or payload.shop_domain or ""
-    clean_url = WooCommerceSyncService.clean_store_url(raw_url)
+    clean_url = WooCommerceSyncService.clean_store_url(payload.store_url)
 
     if not clean_url:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid WooCommerce store URL. Please provide a valid URL (e.g. https://mystore.com).",
+            detail="Invalid WooCommerce store URL. Please provide a valid URL (e.g. https://my-store.com).",
         )
 
-    # 1. Verify credentials if consumer_key and consumer_secret are provided
-    if payload.consumer_key and payload.consumer_secret:
-        is_valid, err_msg = WooCommerceSyncService.verify_credentials(
-            clean_url, payload.consumer_key, payload.consumer_secret
+    # 1. Verify credentials against WooCommerce API
+    is_valid, err_msg = WooCommerceSyncService.verify_credentials(
+        store_url=clean_url,
+        consumer_key=payload.consumer_key,
+        consumer_secret=payload.consumer_secret,
+    )
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to authenticate with WooCommerce store '{clean_url}': {err_msg}",
         )
-        if not is_valid:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to authenticate with WooCommerce store '{clean_url}': {err_msg}",
-            )
 
-    # 2. Save or update StoreIntegration record
+    # 2. Upsert StoreIntegration record
     integration = (
         db.query(StoreIntegration)
         .filter(
@@ -339,10 +345,8 @@ def connect_woocommerce(
         db.add(integration)
     else:
         integration.shop_domain = clean_url
-        if payload.consumer_key:
-            integration.api_key = payload.consumer_key
-        if payload.consumer_secret:
-            integration.access_token = payload.consumer_secret
+        integration.api_key = payload.consumer_key
+        integration.access_token = payload.consumer_secret
         integration.sync_status = "connected"
         integration.updated_at = datetime.now(timezone.utc)
 
@@ -392,7 +396,13 @@ def sync_woocommerce_catalog(
         .first()
     )
 
-    store_url = integration.shop_domain if integration and integration.shop_domain else f"https://{store.name.lower().replace(' ', '')}-store.com"
+    if not integration or not integration.shop_domain:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="WooCommerce store is not connected. Please connect your WooCommerce store first.",
+        )
+
+    store_url = integration.shop_domain
     consumer_key = integration.api_key if integration else None
     consumer_secret = integration.access_token if integration else None
 

@@ -50,7 +50,7 @@ export default function IntegrationsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncingPlatform, setSyncingPlatform] = useState<string | null>(null);
-  const [shopifyDomainInput, setShopifyDomainInput] = useState<string>("yqcncc-b0.myshopify.com");
+  const [shopifyDomainInput, setShopifyDomainInput] = useState<string>("");
   const [isConnectingShopify, setIsConnectingShopify] = useState<boolean>(false);
   const [isDisconnectingShopify, setIsDisconnectingShopify] = useState<boolean>(false);
   const [isClearingCatalog, setIsClearingCatalog] = useState<boolean>(false);
@@ -208,7 +208,7 @@ export default function IntegrationsPage() {
     shopifyStoreInfo?.domain ||
     shopifyIntegration?.shop_domain ||
     shopifyDomainInput ||
-    "myshopify.com";
+    "";
 
   const syncedShopifyProductCount =
     shopifyStoreInfo?.productCount ??
@@ -250,7 +250,7 @@ export default function IntegrationsPage() {
       result?.shop_domain ||
       shopifyDomainInput.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "") ||
       shopifyIntegration?.shop_domain ||
-      `${activeStore?.name.toLowerCase().replace(/[^a-z0-9]/g, "") || "my-brand"}.myshopify.com`;
+      "";
     const count =
       result?.products_synced_count !== undefined
         ? result.products_synced_count
@@ -719,12 +719,12 @@ export default function IntegrationsPage() {
                       required
                       value={shopifyDomainInput}
                       onChange={(e) => setShopifyDomainInput(e.target.value)}
-                      placeholder="your-store-name.myshopify.com"
+                      placeholder="brand-name.myshopify.com"
                       className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-2xl px-4 py-3 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono transition-colors shadow-inner"
                     />
                   </div>
                   <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block">
-                    Enter your Shopify store domain (e.g. <code className="text-emerald-600 dark:text-emerald-400 font-semibold">yqcncc-b0.myshopify.com</code>).
+                    Enter your Shopify store domain (e.g. <code className="text-emerald-600 dark:text-emerald-400 font-semibold">brand-name.myshopify.com</code>).
                   </span>
                 </div>
 
@@ -808,7 +808,7 @@ export default function IntegrationsPage() {
                     Opens your Shopify theme editor with the AI Assistant app embed ready to toggle on.
                   </p>
                   <a
-                    href={`https://${(shopifyDomain || activeStore?.name || "my-brand.myshopify.com").replace(/^https?:\/\//i, "").replace(/\/+$/, "")}/admin/themes/current/editor?context=apps`}
+                    href={`https://${(shopifyDomain || "brand-name.myshopify.com").replace(/^https?:\/\//i, "").replace(/\/+$/, "")}/admin/themes/current/editor?context=apps`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.01] active:scale-[0.99]"

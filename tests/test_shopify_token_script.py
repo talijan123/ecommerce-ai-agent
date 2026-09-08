@@ -49,7 +49,7 @@ def test_exchange_client_credentials_success(mock_post):
     mock_post.return_value = mock_resp
 
     token, raw_json, err = exchange_client_credentials(
-        shop_domain="yqcncc-b0.myshopify.com",
+        shop_domain="mock-brand-store.myshopify.com",
         client_id="custom_client_id",
         client_secret="custom_client_secret",
     )
@@ -68,7 +68,7 @@ def test_exchange_client_credentials_failure(mock_post):
     mock_post.return_value = mock_resp
 
     token, raw_json, err = exchange_client_credentials(
-        shop_domain="yqcncc-b0.myshopify.com",
+        shop_domain="mock-brand-store.myshopify.com",
         client_id="bad_client_id",
         client_secret="bad_client_secret",
     )
@@ -86,7 +86,7 @@ def test_resolve_target_store_and_save_integration():
         # Create a test store
         unique_email = f"test_shopify_{uuid.uuid4().hex[:8]}@example.com"
         test_store = Store(
-            name="YQCNCC Test Store",
+            name="Mock Brand Test Store",
             owner_email=unique_email,
             whatsapp_phone_number_id=f"1555{uuid.uuid4().int % 10000000:07d}",
             is_active=True,
@@ -96,12 +96,12 @@ def test_resolve_target_store_and_save_integration():
         db.refresh(test_store)
 
         # Resolve store
-        resolved = resolve_target_store(db, str(test_store.id), "yqcncc-b0.myshopify.com")
+        resolved = resolve_target_store(db, str(test_store.id), "mock-brand-store.myshopify.com")
         assert resolved.id == test_store.id
 
         # Save integration and sync with test token (purely in DB)
         result = save_integration_and_sync(
-            shop_domain="yqcncc-b0.myshopify.com",
+            shop_domain="mock-brand-store.myshopify.com",
             access_token="shpat_test_mock_token_999",
             client_id="client_id_123",
             store_id=str(test_store.id),
@@ -109,7 +109,7 @@ def test_resolve_target_store_and_save_integration():
         )
 
         assert result["success"] is True
-        assert result["shop_domain"] == "yqcncc-b0.myshopify.com"
+        assert result["shop_domain"] == "mock-brand-store.myshopify.com"
         assert result["store_id"] == str(test_store.id)
 
         # Check DB record
@@ -119,7 +119,7 @@ def test_resolve_target_store_and_save_integration():
             .first()
         )
         assert integration is not None
-        assert integration.shop_domain == "yqcncc-b0.myshopify.com"
+        assert integration.shop_domain == "mock-brand-store.myshopify.com"
         assert integration.access_token == "shpat_test_mock_token_999"
         assert integration.sync_status == "synced"
         assert integration.products_synced_count > 0

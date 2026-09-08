@@ -28,9 +28,7 @@ export function ShopifyConnectModal({
   onClose,
   onSuccess,
 }: ShopifyConnectModalProps) {
-  const [shopDomain, setShopDomain] = useState(
-    `${storeName.toLowerCase().replace(/[^a-z0-9]/g, "") || "my-brand"}.myshopify.com`
-  );
+  const [shopDomain, setShopDomain] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successInfo, setSuccessInfo] = useState<string | null>(null);
@@ -142,12 +140,12 @@ export function ShopifyConnectModal({
                 required
                 value={shopDomain}
                 onChange={(e) => setShopDomain(e.target.value)}
-                placeholder="your-store-name.myshopify.com"
+                placeholder="brand-name.myshopify.com"
                 className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-2xl px-4 py-3 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono transition-colors shadow-inner"
               />
             </div>
             <span className="text-[11px] text-zinc-400 block">
-              Enter your myshopify domain (e.g. <code className="text-emerald-600 dark:text-emerald-400 font-semibold">yqcncc-b0.myshopify.com</code>).
+              Enter your myshopify domain (e.g. <code className="text-emerald-600 dark:text-emerald-400 font-semibold">brand-name.myshopify.com</code>).
             </span>
           </div>
 

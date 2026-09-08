@@ -6,7 +6,7 @@ via Shopify's OAuth / Client Credentials endpoint:
 POST https://{shop_domain}/admin/oauth/access_token
 
 Workflow:
-1. Normalizes shop domain (e.g. yqcncc-b0.myshopify.com).
+1. Normalizes shop domain (e.g. brand-name.myshopify.com).
 2. Performs token exchange with Shopify Admin API using client credentials.
 3. Verifies credentials against /admin/api/2024-01/shop.json.
 4. Saves/upserts the integration record in the database (`store_integrations`).
@@ -226,8 +226,8 @@ def run_interactive_or_cli():
     )
     parser.add_argument(
         "-s", "--shop",
-        default="yqcncc-b0.myshopify.com",
-        help="Shopify store domain (e.g. yqcncc-b0.myshopify.com)",
+        default=os.getenv("SHOPIFY_STORE_URL") or None,
+        help="Shopify store domain (e.g. brand-name.myshopify.com)",
     )
     parser.add_argument(
         "-i", "--client-id",
@@ -263,14 +263,12 @@ def run_interactive_or_cli():
     # Prompt interactively if running in terminal and missing credentials
     if not shop_domain:
         try:
-            shop_domain = input("Enter Shopify Store Domain [yqcncc-b0.myshopify.com]: ").strip()
-            if not shop_domain:
-                shop_domain = "yqcncc-b0.myshopify.com"
+            shop_domain = input("Enter Shopify Store Domain (e.g. brand-name.myshopify.com): ").strip()
         except (EOFError, KeyboardInterrupt):
-            shop_domain = "yqcncc-b0.myshopify.com"
+            shop_domain = None
 
-    clean_domain = ShopifySyncService.clean_shop_domain(shop_domain)
-    print(f"🔹 Target Store Domain:  {clean_domain}")
+    clean_domain = ShopifySyncService.clean_shop_domain(shop_domain) if shop_domain else None
+    print(f"🔹 Target Store Domain:  {clean_domain or '<None>'}")
 
     if not client_id:
         try:
