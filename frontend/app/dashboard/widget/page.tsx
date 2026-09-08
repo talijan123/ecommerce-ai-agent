@@ -20,10 +20,14 @@ import {
   Zap,
   ChevronDown,
   ShoppingBag,
+  AlertCircle,
+  CheckCircle2,
+  ArrowRight,
+  X,
 } from "lucide-react";
 import { Header } from "@/components/dashboard/Header";
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge } from "@/lib/ui";
-import { api, StoreResponse } from "@/lib/api";
+import { api, StoreResponse, IntegrationResponse } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 
@@ -49,6 +53,19 @@ export default function WidgetDashboardPage() {
   const [copiedWebhookWoo, setCopiedWebhookWoo] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // Dynamic store integration state
+  const [integrations, setIntegrations] = useState<IntegrationResponse[]>([]);
+  const [shopifyIntegration, setShopifyIntegration] = useState<IntegrationResponse | null>(null);
+  const [isShopifyConnected, setIsShopifyConnected] = useState<boolean>(false);
+  const [shopifyDomain, setShopifyDomain] = useState<string>("");
+  const [toastNotification, setToastNotification] = useState<{
+    type: "warning" | "success" | "error" | "info";
+    title: string;
+    message: string;
+    actionUrl?: string;
+    actionText?: string;
+  } | null>(null);
+
   useEffect(() => {
     async function loadStores() {
       try {
@@ -66,6 +83,46 @@ export default function WidgetDashboardPage() {
     }
     loadStores();
   }, []);
+
+  // Fetch integration records when activeStoreId changes
+  useEffect(() => {
+    async function loadIntegrations() {
+      if (!activeStoreId) {
+        setIntegrations([]);
+        setShopifyIntegration(null);
+        setIsShopifyConnected(false);
+        setShopifyDomain("");
+        return;
+      }
+      try {
+        const res = await api.getStoreIntegrations(activeStoreId);
+        setIntegrations(res);
+        const shopify = res.find((i) => i.platform.toLowerCase() === "shopify");
+        if (
+          shopify &&
+          (shopify.sync_status === "connected" ||
+            shopify.sync_status === "synced" ||
+            Boolean(shopify.shop_domain) ||
+            (shopify.products_synced_count ?? 0) > 0)
+        ) {
+          setShopifyIntegration(shopify);
+          setIsShopifyConnected(true);
+          setShopifyDomain(shopify.shop_domain || "");
+        } else {
+          setShopifyIntegration(shopify || null);
+          setIsShopifyConnected(false);
+          setShopifyDomain(shopify?.shop_domain || "");
+        }
+      } catch (e) {
+        console.error("Failed to load store integrations for widget:", e);
+        setIntegrations([]);
+        setShopifyIntegration(null);
+        setIsShopifyConnected(false);
+        setShopifyDomain("");
+      }
+    }
+    loadIntegrations();
+  }, [activeStoreId]);
 
   const activeStore = stores.find((s) => s.id === activeStoreId) || stores[0];
   const origin = typeof window !== "undefined" ? window.location.origin : "https://autocommerce.ai";
@@ -89,6 +146,24 @@ export default function WidgetDashboardPage() {
     }
   };
 
+  // Guarded dynamic deep link activation handler
+  const handleActivateShopifyEmbed = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const domain = shopifyDomain || shopifyIntegration?.shop_domain;
+    if (!isShopifyConnected || !domain) {
+      setToastNotification({
+        type: "warning",
+        title: "Shopify Store Required",
+        message: "Please connect your Shopify store first in the Integrations tab before activating the widget.",
+        actionUrl: "/dashboard/integrations",
+        actionText: "Connect in Integrations",
+      });
+      return;
+    }
+    const cleanDomain = domain.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+    window.open(`https://${cleanDomain}/admin/themes/current/editor?context=apps`, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <Header
@@ -97,6 +172,58 @@ export default function WidgetDashboardPage() {
       />
 
       <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6 animate-in fade-in duration-300">
+        {/* Toast Warning / Status Notification */}
+        {toastNotification && (
+          <div
+            className={`p-4 rounded-2xl border shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in slide-in-from-top-4 duration-300 ${
+              toastNotification.type === "warning"
+                ? "bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200"
+                : toastNotification.type === "error"
+                ? "bg-rose-500/10 border-rose-500/30 text-rose-900 dark:text-rose-200"
+                : toastNotification.type === "success"
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200"
+                : "bg-blue-500/10 border-blue-500/30 text-blue-900 dark:text-blue-200"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              {toastNotification.type === "warning" && (
+                <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              )}
+              {toastNotification.type === "error" && (
+                <AlertCircle className="h-5 w-5 text-rose-500 shrink-0 mt-0.5" />
+              )}
+              {toastNotification.type === "success" && (
+                <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+              )}
+              {toastNotification.type === "info" && (
+                <Sparkles className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+              )}
+              <div>
+                <h4 className="text-sm font-bold">{toastNotification.title}</h4>
+                <p className="text-xs opacity-90 mt-0.5">{toastNotification.message}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+              {toastNotification.actionUrl && (
+                <Link
+                  href={toastNotification.actionUrl}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-200 transition-colors border border-amber-500/30"
+                >
+                  <span>{toastNotification.actionText || "Open"}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={() => setToastNotification(null)}
+                className="text-xs font-semibold p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Page Title & Status */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -150,27 +277,35 @@ export default function WidgetDashboardPage() {
                       <ShoppingBag className="w-5 h-5" />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <CardTitle className="text-base text-white">Shopify 1-Click Theme Embed</CardTitle>
                         <Badge variant="emerald" className="text-[10px] uppercase font-bold py-0.5">
                           Zero-Code
                         </Badge>
+                        {isShopifyConnected && shopifyDomain ? (
+                          <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/30 font-mono py-0.5">
+                            {shopifyDomain}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px] text-zinc-400 py-0.5">
+                            Not Connected
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-xs text-zinc-400">
                         Opens your Shopify theme editor with the AI Assistant app embed ready to toggle on.
                       </p>
                     </div>
                   </div>
-                  <a
-                    href={`https://${(activeStore?.name || "my-brand").toLowerCase().replace(/[^a-z0-9]/g, "")}.myshopify.com/admin/themes/current/editor?context=apps`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all shrink-0 hover:scale-105 active:scale-95"
+                  <button
+                    type="button"
+                    onClick={handleActivateShopifyEmbed}
+                    className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all shrink-0 hover:scale-105 active:scale-95 cursor-pointer"
                   >
                     <ShoppingBag className="w-3.5 h-3.5" />
                     <span>Activate in 1-Click</span>
                     <ExternalLink className="w-3 h-3 opacity-80" />
-                  </a>
+                  </button>
                 </div>
               </CardHeader>
             </Card>
@@ -347,7 +482,7 @@ export default function WidgetDashboardPage() {
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
                 </div>
                 <div className="px-3 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[10px] text-zinc-400 font-mono truncate max-w-[220px]">
-                  https://{activeStore?.name.toLowerCase().replace(/\s+/g, "") || "store"}.myshopify.com
+                  https://{shopifyDomain ? shopifyDomain.replace(/^https?:\/\//i, "").replace(/\/+$/, "") : "your-store.myshopify.com"}
                 </div>
                 <div className="w-6" />
               </div>
