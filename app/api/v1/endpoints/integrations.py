@@ -5,6 +5,7 @@ and tracking continuous sync status per merchant store tenant.
 """
 
 import uuid
+import logging
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -35,6 +36,7 @@ from app.services.shopify_service import ShopifySyncService
 from app.services.woocommerce_service import WooCommerceSyncService
 
 router = APIRouter()
+logger = logging.getLogger("integrations")
 
 
 def _get_user_store(store_id_str: str, db: Session, current_user: User) -> Store:
@@ -227,12 +229,16 @@ def connect_shopify(
     # 3. Auto-inject ScriptTag for zero-friction storefront widget installation
     if access_token:
         try:
-            ShopifySyncService.ensure_widget_script_tag(
+            success, tag_data, err = ShopifySyncService.ensure_widget_script_tag(
                 shop_domain=clean_domain,
                 access_token=access_token,
             )
+            if success:
+                logger.info(f"[ScriptTag] Successfully registered widget.js on shopify store: {clean_domain}")
+            else:
+                logger.warning(f"[ScriptTag] Registration notice on {clean_domain}: {err}")
         except Exception as e:
-            print(f"[WARN] Shopify ScriptTag auto-injection notice: {e}")
+            logger.warning(f"[WARN] Shopify ScriptTag auto-injection notice: {e}")
 
     # 4. Immediately ingest products
     try:
@@ -370,12 +376,14 @@ def shopify_oauth_callback(
 
     # 4. Auto-inject ScriptTag for zero-friction storefront widget
     try:
-        ShopifySyncService.ensure_widget_script_tag(
+        success, tag_data, err = ShopifySyncService.ensure_widget_script_tag(
             shop_domain=clean_domain,
             access_token=access_token,
         )
+        if success:
+            logger.info(f"[ScriptTag] Successfully registered widget.js on shopify store: {clean_domain}")
     except Exception as e:
-        print(f"[WARN] ScriptTag injection during OAuth callback: {e}")
+        logger.warning(f"[WARN] ScriptTag injection during OAuth callback: {e}")
 
     # 5. Ingest catalog in background
     try:
@@ -685,6 +693,8 @@ def inject_shopify_script_tag(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Failed to inject ScriptTag: {err}",
         )
+
+    logger.info(f"[ScriptTag] Successfully registered widget.js on shopify store: {integration.shop_domain}")
 
     return {
         "success": True,

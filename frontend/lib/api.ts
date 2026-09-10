@@ -534,6 +534,23 @@ export const api = {
     return res.data;
   },
 
+  async injectShopifyScriptTag(
+    storeId: string,
+    scriptUrl?: string
+  ): Promise<{ success: boolean; message: string; script_tag?: any; shop_domain?: string }> {
+    const res = await apiClient.post<{ success: boolean; message: string; script_tag?: any; shop_domain?: string }>(
+      "/api/v1/integrations/shopify/script-tag",
+      null,
+      {
+        params: {
+          store_id: storeId,
+          ...(scriptUrl ? { script_url: scriptUrl } : {}),
+        },
+      }
+    );
+    return res.data;
+  },
+
   // ----------------------------------------
   // Support Tickets API
   // ----------------------------------------

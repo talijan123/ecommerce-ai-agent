@@ -130,7 +130,7 @@ class ShopifySyncService:
     def sanitize_scopes(cls, scopes: Optional[str] = None) -> str:
         """Ensure SCOPES string is comma-separated without illegal characters or extra whitespace."""
         if not scopes:
-            scopes = getattr(settings, "SHOPIFY_SCOPES", "read_products,write_products,read_orders,read_checkouts,read_inventory,write_inventory")
+            scopes = getattr(settings, "SHOPIFY_SCOPES", "read_products,read_orders,read_checkouts,read_script_tags,write_script_tags,read_themes")
         scope_list = [re.sub(r"[^a-zA-Z0-9_\-]", "", s.strip()) for s in re.split(r"[,\s]+", str(scopes)) if s.strip()]
         return ",".join(dict.fromkeys(scope_list)) or "read_products,write_products,read_orders,read_checkouts"
 
@@ -227,9 +227,7 @@ class ShopifySyncService:
         """Resolve public CDN/frontend URL for widget.js script tag."""
         if override_url and override_url.strip():
             return override_url.strip()
-        if getattr(settings, "WIDGET_JS_URL", "") and settings.WIDGET_JS_URL.strip():
-            return settings.WIDGET_JS_URL.strip()
-        frontend_url = getattr(settings, "FRONTEND_URL", "https://ecommerce-store-frontend-swart.vercel.app").strip().rstrip("/")
+        frontend_url = (getattr(settings, "FRONTEND_URL", "") or "https://ecommerce-store-frontend-swart.vercel.app").strip().rstrip("/")
         return f"{frontend_url}/widget.js"
 
     @classmethod
@@ -292,7 +290,6 @@ class ShopifySyncService:
 
         # Handle mock/sandbox testing
         if cls.is_mock_or_test_token(access_token, clean_domain):
-            logger.info(f"[ShopifyScriptTag] Mocking ScriptTag injection for {clean_domain} -> {target_src}")
             mock_tag = {
                 "id": 99012345,
                 "src": target_src,
@@ -301,6 +298,7 @@ class ShopifySyncService:
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
+            logger.info(f"[ScriptTag] Successfully registered widget.js on shopify store: {clean_domain}")
             return True, mock_tag, None
 
         if not access_token or not access_token.strip():
@@ -310,8 +308,8 @@ class ShopifySyncService:
         existing_tags = cls.list_script_tags(clean_domain, access_token)
         for tag in existing_tags:
             src = (tag.get("src") or "").strip()
-            if src == target_src or "widget.js" in src:
-                logger.info(f"[ShopifyScriptTag] Widget ScriptTag already active on {clean_domain} (ID: {tag.get('id')})")
+            if src == target_src or src.endswith("/widget.js"):
+                logger.info(f"[ScriptTag] Successfully registered widget.js on shopify store: {clean_domain}")
                 return True, tag, None
 
         # 2. Inject ScriptTag
@@ -334,7 +332,7 @@ class ShopifySyncService:
                 res = client.post(url, json=payload, headers=headers)
                 if res.status_code in (200, 201):
                     created_tag = res.json().get("script_tag", {})
-                    logger.info(f"[ShopifyScriptTag] Successfully injected widget ScriptTag on {clean_domain} (ID: {created_tag.get('id')})")
+                    logger.info(f"[ScriptTag] Successfully registered widget.js on shopify store: {clean_domain}")
                     return True, created_tag, None
                 else:
                     err_msg = f"HTTP {res.status_code}: {res.text[:300]}"

@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ExternalLink,
+  Eye,
   Zap,
   ArrowRight,
   Sparkles,
@@ -78,6 +79,7 @@ export default function IntegrationsPage() {
 
   // Instant reactive feedback
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [isReinjectingScriptTag, setIsReinjectingScriptTag] = useState(false);
   const [lastSyncTimes, setLastSyncTimes] = useState<Record<string, string>>({});
   const [toastNotification, setToastNotification] = useState<{
     type: "success" | "error" | "info" | "warning";
@@ -551,33 +553,49 @@ export default function IntegrationsPage() {
     }
   };
 
-  // 1-Click Theme App Embed Activation Guard
-  const handleActivateShopifyThemeEmbed = (e: React.MouseEvent) => {
+  // Open live storefront to view injected widget
+  const handleViewLiveWidget = (e: React.MouseEvent) => {
     e.preventDefault();
     const domain = shopifyDomain || shopifyStoreInfo?.domain || shopifyIntegration?.shop_domain;
     if (!isShopifyConnected || !domain) {
       showToast(
         "warning",
         "Shopify Store Required",
-        "Please connect your Shopify store first in the Integrations tab before activating the widget."
+        "Please connect your Shopify store first in the Integrations tab before viewing the live widget."
       );
       return;
     }
     const cleanDomain = domain.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
-    const shopName = cleanDomain.endsWith(".myshopify.com")
-      ? cleanDomain.slice(0, -".myshopify.com".length)
-      : cleanDomain.split(".")[0];
-    const appEmbedId = (process.env.NEXT_PUBLIC_SHOPIFY_APP_EMBED_EXTENSION_ID || "").trim();
+    window.open(`https://${cleanDomain}`, "_blank", "noopener,noreferrer");
+  };
 
-    let deepLink: string;
-    if (appEmbedId && shopName) {
-      const formattedEmbedId = appEmbedId.endsWith("/app-embed") ? appEmbedId : `${appEmbedId}/app-embed`;
-      deepLink = `https://admin.shopify.com/store/${shopName}/themes/current/editor?context=apps&activateAppId=${formattedEmbedId}`;
-    } else {
-      deepLink = `https://${cleanDomain}/admin/themes/current/editor?context=apps`;
+  // Re-inject ScriptTag directly via Shopify Admin REST API
+  const handleReinjectScriptTag = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!activeStoreId) {
+      showToast("warning", "Store Required", "Please select an active store to re-inject the widget ScriptTag.");
+      return;
+    }
+    const domain = shopifyDomain || shopifyStoreInfo?.domain || shopifyIntegration?.shop_domain;
+    if (!isShopifyConnected || !domain) {
+      showToast("warning", "Shopify Store Required", "Please connect your Shopify store first.");
+      return;
     }
 
-    window.open(deepLink, "_blank", "noopener,noreferrer");
+    try {
+      setIsReinjectingScriptTag(true);
+      const res = await api.injectShopifyScriptTag(activeStoreId);
+      showToast(
+        "success",
+        "ScriptTag Injected Successfully",
+        `Verified widget.js ScriptTag on ${res.shop_domain || domain}. The AI chat assistant is active on your live storefront.`
+      );
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.detail || err?.message || "Failed to inject ScriptTag.";
+      showToast("error", "Injection Failed", String(errMsg));
+    } finally {
+      setIsReinjectingScriptTag(false);
+    }
   };
 
   return (
@@ -825,31 +843,42 @@ export default function IntegrationsPage() {
                   </div>
                 </div>
 
-                {/* 1-Click Theme App Embed Activation (when connected) */}
+                {/* Shopify Live Storefront Widget (when connected) */}
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 space-y-2.5 animate-in fade-in duration-300">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-emerald-500" />
                       <span className="text-xs font-bold text-zinc-900 dark:text-white">
-                        Shopify Theme App Embed
+                        Shopify Live Storefront Widget
                       </span>
                     </div>
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                      Zero-Code
+                      ScriptTag Active
                     </span>
                   </div>
                   <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                    Opens your Shopify theme editor with the AI Assistant app embed ready to toggle on.
+                    The AutoCommerce AI widget is automatically injected into your Shopify theme via ScriptTag.
                   </p>
-                  <button
-                    type="button"
-                    onClick={handleActivateShopifyThemeEmbed}
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
-                  >
-                    <ShoppingBag className="h-4 w-4" />
-                    <span>Activate Widget in 1-Click</span>
-                    <ExternalLink className="h-3.5 w-3.5 ml-0.5 opacity-80" />
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      type="button"
+                      onClick={handleViewLiveWidget}
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                    >
+                      <Eye className="h-4 w-4" />
+                      <span>View Live Widget on Store</span>
+                      <ExternalLink className="h-3.5 w-3.5 ml-0.5 opacity-80" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleReinjectScriptTag}
+                      disabled={isReinjectingScriptTag}
+                      className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${isReinjectingScriptTag ? "animate-spin" : ""}`} />
+                      <span>{isReinjectingScriptTag ? "Injecting..." : "Re-inject ScriptTag"}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Actions Bar */}

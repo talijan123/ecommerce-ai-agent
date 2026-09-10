@@ -58,6 +58,7 @@ export default function WidgetDashboardPage() {
   const [shopifyIntegration, setShopifyIntegration] = useState<IntegrationResponse | null>(null);
   const [isShopifyConnected, setIsShopifyConnected] = useState<boolean>(false);
   const [shopifyDomain, setShopifyDomain] = useState<string>("");
+  const [isReinjectingScriptTag, setIsReinjectingScriptTag] = useState<boolean>(false);
   const [toastNotification, setToastNotification] = useState<{
     type: "warning" | "success" | "error" | "info";
     title: string;
@@ -146,35 +147,65 @@ export default function WidgetDashboardPage() {
     }
   };
 
-  // Guarded dynamic deep link activation handler
-  const handleActivateShopifyEmbed = (e: React.MouseEvent) => {
+  // Open live storefront to verify widget
+  const handleViewLiveWidget = (e: React.MouseEvent) => {
     e.preventDefault();
     const domain = shopifyDomain || shopifyIntegration?.shop_domain;
     if (!isShopifyConnected || !domain) {
       setToastNotification({
         type: "warning",
         title: "Shopify Store Required",
-        message: "Please connect your Shopify store first in the Integrations tab before activating the widget.",
+        message: "Please connect your Shopify store first in the Integrations tab before viewing the live widget.",
         actionUrl: "/dashboard/integrations",
         actionText: "Connect in Integrations",
       });
       return;
     }
     const cleanDomain = domain.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
-    const shopName = cleanDomain.endsWith(".myshopify.com")
-      ? cleanDomain.slice(0, -".myshopify.com".length)
-      : cleanDomain.split(".")[0];
-    const appEmbedId = (process.env.NEXT_PUBLIC_SHOPIFY_APP_EMBED_EXTENSION_ID || "").trim();
+    window.open(`https://${cleanDomain}`, "_blank", "noopener,noreferrer");
+  };
 
-    let deepLink: string;
-    if (appEmbedId && shopName) {
-      const formattedEmbedId = appEmbedId.endsWith("/app-embed") ? appEmbedId : `${appEmbedId}/app-embed`;
-      deepLink = `https://admin.shopify.com/store/${shopName}/themes/current/editor?context=apps&activateAppId=${formattedEmbedId}`;
-    } else {
-      deepLink = `https://${cleanDomain}/admin/themes/current/editor?context=apps`;
+  // Re-inject ScriptTag directly via Shopify Admin REST API
+  const handleReinjectScriptTag = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!activeStoreId) {
+      setToastNotification({
+        type: "warning",
+        title: "Store Selection Required",
+        message: "Please select an active store to re-inject the widget ScriptTag.",
+      });
+      return;
+    }
+    const domain = shopifyDomain || shopifyIntegration?.shop_domain;
+    if (!isShopifyConnected || !domain) {
+      setToastNotification({
+        type: "warning",
+        title: "Shopify Store Required",
+        message: "Please connect your Shopify store first in the Integrations tab.",
+        actionUrl: "/dashboard/integrations",
+        actionText: "Connect in Integrations",
+      });
+      return;
     }
 
-    window.open(deepLink, "_blank", "noopener,noreferrer");
+    try {
+      setIsReinjectingScriptTag(true);
+      const res = await api.injectShopifyScriptTag(activeStoreId);
+      setToastNotification({
+        type: "success",
+        title: "ScriptTag Injected Successfully",
+        message: `Verified widget.js ScriptTag on ${res.shop_domain || domain}. The AI chat assistant is active on your live storefront.`,
+      });
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.detail || err?.message || "Failed to inject ScriptTag.";
+      setToastNotification({
+        type: "error",
+        title: "Injection Failed",
+        message: String(errMsg),
+      });
+    } finally {
+      setIsReinjectingScriptTag(false);
+    }
   };
 
   return (
@@ -281,7 +312,7 @@ export default function WidgetDashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Column: Embed Code & Customizer (7 cols) */}
           <div className="lg:col-span-7 space-y-6">
-            {/* 1-Click Shopify Theme App Embed Card */}
+            {/* Shopify Live Storefront Widget Card */}
             <Card className="border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-zinc-900/60 to-zinc-900/90 shadow-xl overflow-hidden">
               <CardHeader className="border-b border-zinc-800/80 pb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -291,9 +322,9 @@ export default function WidgetDashboardPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <CardTitle className="text-base text-white">Shopify 1-Click Theme Embed</CardTitle>
+                        <CardTitle className="text-base text-white">Shopify Live Storefront Widget</CardTitle>
                         <Badge variant="emerald" className="text-[10px] uppercase font-bold py-0.5">
-                          Zero-Code
+                          {isShopifyConnected ? "ScriptTag Active" : "ScriptTag"}
                         </Badge>
                         {isShopifyConnected && shopifyDomain ? (
                           <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/30 font-mono py-0.5">
@@ -306,19 +337,45 @@ export default function WidgetDashboardPage() {
                         )}
                       </div>
                       <p className="text-xs text-zinc-400">
-                        Opens your Shopify theme editor with the AI Assistant app embed ready to toggle on.
+                        {isShopifyConnected
+                          ? "Automatically injected onto your live Shopify storefront via ScriptTag. No manual theme editing required."
+                          : "Connect your Shopify store in Integrations to automatically inject the widget."}
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleActivateShopifyEmbed}
-                    className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all shrink-0 hover:scale-105 active:scale-95 cursor-pointer"
-                  >
-                    <ShoppingBag className="w-3.5 h-3.5" />
-                    <span>Activate in 1-Click</span>
-                    <ExternalLink className="w-3 h-3 opacity-80" />
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                    {isShopifyConnected ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleViewLiveWidget}
+                          className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all shrink-0 hover:scale-105 active:scale-95 cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View Live Widget on Store</span>
+                          <ExternalLink className="w-3 h-3 opacity-80" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleReinjectScriptTag}
+                          disabled={isReinjectingScriptTag}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold transition shrink-0 cursor-pointer disabled:opacity-50"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isReinjectingScriptTag ? "animate-spin" : ""}`} />
+                          <span>{isReinjectingScriptTag ? "Injecting..." : "Re-inject ScriptTag"}</span>
+                        </button>
+                      </>
+                    ) : (
+                      <Link
+                        href="/dashboard/integrations"
+                        className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all shrink-0 hover:scale-105 active:scale-95 cursor-pointer"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5" />
+                        <span>Connect Shopify Store</span>
+                        <ArrowRight className="w-3 h-3 opacity-80" />
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
             </Card>

@@ -226,17 +226,17 @@ def run_interactive_or_cli():
     )
     parser.add_argument(
         "-s", "--shop",
-        default=os.getenv("SHOPIFY_STORE_URL") or None,
+        default=getattr(settings, "SHOPIFY_STORE_URL", None) or os.getenv("SHOPIFY_STORE_URL") or None,
         help="Shopify store domain (e.g. brand-name.myshopify.com)",
     )
     parser.add_argument(
         "-i", "--client-id",
-        default=os.getenv("SHOPIFY_CLIENT_ID") or os.getenv("SHOPIFY_API_KEY"),
+        default=getattr(settings, "SHOPIFY_CLIENT_ID", None) or os.getenv("SHOPIFY_CLIENT_ID") or os.getenv("SHOPIFY_API_KEY"),
         help="Shopify App Client ID (API Key)",
     )
     parser.add_argument(
         "-k", "--client-secret",
-        default=os.getenv("SHOPIFY_CLIENT_SECRET") or os.getenv("SHOPIFY_API_SECRET"),
+        default=getattr(settings, "SHOPIFY_CLIENT_SECRET", None) or os.getenv("SHOPIFY_CLIENT_SECRET") or os.getenv("SHOPIFY_API_SECRET"),
         help="Shopify App Client Secret",
     )
     parser.add_argument(
