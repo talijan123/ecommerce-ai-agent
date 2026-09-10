@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     SHOPIFY_REDIRECT_URI: str = Field(default="")
     SHOPIFY_APP_EMBED_EXTENSION_ID: str = Field(default="")
     FRONTEND_URL: str = Field(default="https://ecommerce-store-frontend-swart.vercel.app")
-    WIDGET_JS_URL: str = Field(default="")
+    WIDGET_JS_URL: str = Field(default="https://ecommerce-store-frontend-swart.vercel.app/widget.js")
 
     # Abandoned Cart Background Worker & Recovery Settings
     RECOVERY_CRON_INTERVAL_MINUTES: int = Field(default=15)

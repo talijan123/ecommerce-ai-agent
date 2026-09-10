@@ -224,11 +224,20 @@ class ShopifySyncService:
 
     @classmethod
     def get_widget_script_url(cls, override_url: Optional[str] = None) -> str:
-        """Resolve public CDN/frontend URL for widget.js script tag."""
+        """Resolve public CDN/frontend URL for widget.js script tag. Ensures valid HTTPS and no localhost."""
+        url = None
         if override_url and override_url.strip():
-            return override_url.strip()
-        frontend_url = (getattr(settings, "FRONTEND_URL", "") or "https://ecommerce-store-frontend-swart.vercel.app").strip().rstrip("/")
-        return f"{frontend_url}/widget.js"
+            url = override_url.strip()
+        elif getattr(settings, "WIDGET_JS_URL", None) and getattr(settings, "WIDGET_JS_URL").strip():
+            url = getattr(settings, "WIDGET_JS_URL").strip()
+        else:
+            frontend_url = (getattr(settings, "FRONTEND_URL", "") or "https://ecommerce-store-frontend-swart.vercel.app").strip().rstrip("/")
+            url = f"{frontend_url}/widget.js"
+
+        # Validate URL: Must be publicly accessible HTTPS URL and disallow localhost / HTTP
+        if not url.startswith("https://") or "localhost" in url or "127.0.0.1" in url:
+            url = "https://ecommerce-store-frontend-swart.vercel.app/widget.js"
+        return url
 
     @classmethod
     def list_script_tags(
@@ -298,6 +307,7 @@ class ShopifySyncService:
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
+            logger.info(f"ScriptTag created successfully with ID: {mock_tag['id']}")
             logger.info(f"[ScriptTag] Successfully registered widget.js on shopify store: {clean_domain}")
             return True, mock_tag, None
 
@@ -309,7 +319,7 @@ class ShopifySyncService:
         for tag in existing_tags:
             src = (tag.get("src") or "").strip()
             if src == target_src or src.endswith("/widget.js"):
-                logger.info(f"[ScriptTag] Successfully registered widget.js on shopify store: {clean_domain}")
+                logger.info(f"[ScriptTag] Existing widget.js ScriptTag found with ID: {tag.get('id')} on shopify store: {clean_domain}")
                 return True, tag, None
 
         # 2. Inject ScriptTag
@@ -330,13 +340,18 @@ class ShopifySyncService:
         try:
             with httpx.Client(timeout=15.0) as client:
                 res = client.post(url, json=payload, headers=headers)
-                if res.status_code in (200, 201):
+                if res.status_code == 201:
                     created_tag = res.json().get("script_tag", {})
+                    logger.info(f"ScriptTag created successfully with ID: {created_tag.get('id')}")
                     logger.info(f"[ScriptTag] Successfully registered widget.js on shopify store: {clean_domain}")
                     return True, created_tag, None
+                elif res.status_code == 200:
+                    created_tag = res.json().get("script_tag", {})
+                    logger.info(f"ScriptTag created successfully with ID: {created_tag.get('id')}")
+                    return True, created_tag, None
                 else:
-                    err_msg = f"HTTP {res.status_code}: {res.text[:300]}"
-                    logger.warning(f"[ShopifyScriptTag] Failed to inject ScriptTag on {clean_domain}: {err_msg}")
+                    err_msg = f"HTTP {res.status_code}: {res.text}"
+                    logger.error(f"[ShopifyScriptTag] Failed to inject ScriptTag on {clean_domain}: {err_msg}")
                     return False, None, err_msg
         except Exception as e:
             err_msg = f"Connection error injecting ScriptTag: {str(e)}"

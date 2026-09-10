@@ -666,7 +666,9 @@ def inject_shopify_script_tag(
     db: Session = Depends(get_db),
 ):
     """
-    Directly inject the storefront chat widget ScriptTag via Shopify Admin REST API.
+    Directly inject the storefront chat widget ScriptTag via Shopify Admin REST API:
+    POST https://{shop_domain}/admin/api/2024-01/script_tags.json
+    Payload: {"script_tag": {"event": "onload", "src": settings.WIDGET_JS_URL, "display_scope": "all"}}
     """
     store = _get_user_store(store_id, db, current_user)
     integration = (
@@ -683,25 +685,83 @@ def inject_shopify_script_tag(
             detail="Shopify store is not connected. Please connect your Shopify store first.",
         )
 
-    success, tag_data, err = ShopifySyncService.ensure_widget_script_tag(
-        shop_domain=integration.shop_domain,
-        access_token=integration.access_token,
-        script_url=script_url,
-    )
-    if not success:
+    clean_domain = ShopifySyncService.clean_shop_domain(integration.shop_domain)
+    target_src = script_url or getattr(settings, "WIDGET_JS_URL", None) or ShopifySyncService.get_widget_script_url()
+
+    # Handle mock/sandbox testing
+    if ShopifySyncService.is_mock_or_test_token(integration.access_token, clean_domain):
+        mock_id = 99012345
+        logger.info(f"ScriptTag created successfully with ID: {mock_id}")
+        return {
+            "success": True,
+            "message": f"ScriptTag created successfully with ID: {mock_id}",
+            "script_tag": {
+                "id": mock_id,
+                "src": target_src,
+                "event": "onload",
+                "display_scope": "all",
+            },
+            "shop_domain": clean_domain,
+        }
+
+    # Execute Shopify REST API call: POST https://{shop_domain}/admin/api/2024-01/script_tags.json
+    url = f"https://{clean_domain}/admin/api/{ShopifySyncService.API_VERSION}/script_tags.json"
+    headers = {
+        "X-Shopify-Access-Token": (integration.access_token or "").strip(),
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    payload = {
+        "script_tag": {
+            "event": "onload",
+            "src": target_src,
+            "display_scope": "all",
+        }
+    }
+
+    try:
+        import httpx
+        with httpx.Client(timeout=15.0) as client:
+            res = client.post(url, json=payload, headers=headers)
+            if res.status_code == 201:
+                res_data = res.json()
+                tag = res_data.get("script_tag", {})
+                tag_id = tag.get("id")
+                logger.info(f"ScriptTag created successfully with ID: {tag_id}")
+                return {
+                    "success": True,
+                    "message": f"ScriptTag created successfully with ID: {tag_id}",
+                    "script_tag": tag,
+                    "shop_domain": clean_domain,
+                }
+            elif res.status_code == 422 and "already been taken" in res.text:
+                existing = ShopifySyncService.list_script_tags(clean_domain, integration.access_token)
+                matched = next((t for t in existing if (t.get("src") or "").strip() == target_src), None)
+                tag_id = matched.get("id") if matched else "existing"
+                logger.info(f"ScriptTag created successfully with ID: {tag_id}")
+                return {
+                    "success": True,
+                    "message": f"ScriptTag already exists with ID: {tag_id}",
+                    "script_tag": matched or {"id": tag_id, "src": target_src},
+                    "shop_domain": clean_domain,
+                }
+            else:
+                error_payload = res.text
+                print(f"[ERROR] Shopify ScriptTag creation failed: HTTP {res.status_code} - {error_payload}")
+                logger.error(f"[ScriptTag] Shopify error response payload: {error_payload}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Shopify ScriptTag error (HTTP {res.status_code}): {error_payload}",
+                )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Detailed Shopify error response payload / connection error: {e}")
+        logger.error(f"[ScriptTag] Connection error: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to inject ScriptTag: {err}",
+            detail=f"Detailed Shopify error response payload: {str(e)}",
         )
-
-    logger.info(f"[ScriptTag] Successfully registered widget.js on shopify store: {integration.shop_domain}")
-
-    return {
-        "success": True,
-        "message": "Storefront widget ScriptTag injected successfully",
-        "script_tag": tag_data,
-        "shop_domain": integration.shop_domain,
-    }
 
 
 @router.delete(
