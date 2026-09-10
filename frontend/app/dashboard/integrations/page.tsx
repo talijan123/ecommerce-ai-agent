@@ -599,7 +599,7 @@ export default function IntegrationsPage() {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in max-w-7xl mx-auto pb-12">
+    <div className="space-y-8 animate-fade-in max-w-7xl mx-auto pb-20">
       {/* Toast Notification Banner */}
       {toastNotification && (
         <div
@@ -711,244 +711,267 @@ export default function IntegrationsPage() {
         {/* ========================================================================= */}
         {/* 1. SHOPIFY INTEGRATION CARD */}
         {/* ========================================================================= */}
-        <Card className={`relative overflow-hidden transition-all duration-300 rounded-3xl border ${
-          isShopifyConnected
-            ? "border-emerald-500/30 dark:border-emerald-500/20 bg-gradient-to-b from-emerald-500/[0.04] to-transparent shadow-emerald-500/5"
-            : "border-zinc-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/60"
-        } backdrop-blur-xl shadow-lg hover:shadow-xl`}>
-          <div className="p-6 sm:p-7 space-y-6">
-            {/* Top Row: Icon, Title, Status Badge */}
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3.5">
-                <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center shadow-lg shadow-emerald-600/20 shrink-0">
-                  <ShoppingBag className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Shopify</h3>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                      1-Click Connect
-                    </span>
-                  </div>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Live product catalog &amp; variant synchronization
-                  </p>
-                </div>
+        <Card
+          className={`relative rounded-3xl border p-6 transition-all duration-300 ${
+            isShopifyConnected
+              ? "border-emerald-500/30 dark:border-emerald-500/20 bg-gradient-to-b from-emerald-500/[0.04] to-transparent shadow-emerald-500/5"
+              : "border-zinc-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/60"
+          } backdrop-blur-xl shadow-lg hover:shadow-xl space-y-4`}
+        >
+          {/* Top Row: Icon, Title, Clean Status Indicator */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center shadow-lg shadow-emerald-600/20 shrink-0">
+                <ShoppingBag className="h-5 w-5" />
               </div>
-
-              {/* Reactive Status Badge & Product Count */}
-              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
-                {isShopifyConnected ? (
-                  <>
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-in fade-in duration-300 shadow-sm shadow-emerald-500/10">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>● Connected: {shopifyDomain}</span>
-                    </div>
-                    <div className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
-                      <PackageCheck className="h-3.5 w-3.5 text-emerald-500" />
-                      <span>{syncedShopifyProductCount} Synced</span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
-                    Not Connected
-                  </div>
-                )}
+              <div>
+                <h3 className="text-lg font-bold text-zinc-900 dark:text-white leading-tight">Shopify</h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  Live catalog &amp; variant synchronization
+                </p>
               </div>
             </div>
 
-            {/* If NOT connected: Show single clean Domain Input & Connect Button */}
-            {!isShopifyConnected ? (
-              <form onSubmit={handleDirectConnectShopify} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
-                    <span>Store Domain *</span>
-                    <span className="text-[10px] text-zinc-400 font-mono">.myshopify.com</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      value={shopifyDomainInput}
-                      onChange={(e) => setShopifyDomainInput(e.target.value)}
-                      placeholder="brand-name.myshopify.com"
-                      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-2xl px-4 py-3 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono transition-colors shadow-inner"
-                    />
-                  </div>
-                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block">
-                    Enter your Shopify store domain (e.g. <code className="text-emerald-600 dark:text-emerald-400 font-semibold">brand-name.myshopify.com</code>).
-                  </span>
-                </div>
+            {/* Single Clean Status Indicator */}
+            <div>
+              {isShopifyConnected ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Connected
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+                  Not Connected
+                </span>
+              )}
+            </div>
+          </div>
 
-                <Button
-                  type="submit"
-                  variant="gradient"
-                  size="sm"
-                  className="w-full rounded-2xl min-h-[46px] font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
-                  disabled={isConnectingShopify}
-                >
-                  {isConnectingShopify ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      <span>Connecting &amp; Ingesting Catalog...</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingBag className="h-4 w-4 mr-2" />
-                      <span>Connect Shopify Store</span>
-                    </>
-                  )}
-                </Button>
-              </form>
-            ) : (
-              /* If CONNECTED: Show active enterprise status, 1-Click embed & re-sync button */
-              <div className="space-y-6">
-                {/* Connection Details Box */}
-                <div className="p-4 rounded-2xl bg-zinc-50/80 dark:bg-zinc-950/50 border border-zinc-200/60 dark:border-zinc-800/60 space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                      <Globe className="h-3.5 w-3.5 text-emerald-500" /> Connected Domain
-                    </span>
-                    {shopifyDomain ? (
+          {/* If NOT connected: Show single clean Domain Input & Connect Button */}
+          {!isShopifyConnected ? (
+            <form onSubmit={handleDirectConnectShopify} className="space-y-4 pt-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+                  <span>Store Domain *</span>
+                  <span className="text-[10px] text-zinc-400 font-mono">.myshopify.com</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={shopifyDomainInput}
+                    onChange={(e) => setShopifyDomainInput(e.target.value)}
+                    placeholder="brand-name.myshopify.com"
+                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-2xl px-4 py-3 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono transition-colors shadow-inner"
+                  />
+                </div>
+                <span className="text-[11px] text-zinc-500 dark:text-zinc-400 block">
+                  Enter your Shopify store domain (e.g. <code className="text-emerald-600 dark:text-emerald-400 font-semibold">brand-name.myshopify.com</code>).
+                </span>
+              </div>
+
+              <Button
+                type="submit"
+                variant="gradient"
+                size="sm"
+                className="w-full rounded-2xl min-h-[44px] font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                disabled={isConnectingShopify}
+              >
+                {isConnectingShopify ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <span>Connecting &amp; Ingesting Catalog...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag className="h-4 w-4 mr-2" />
+                    <span>Connect Shopify Store</span>
+                  </>
+                )}
+              </Button>
+            </form>
+          ) : (
+            /* If CONNECTED: Clean Key-Value Details, Storefront Widget Box, and Action Bar */
+            <div className="space-y-4">
+              {/* Clean Key-Value Details Card */}
+              <div className="p-4 rounded-2xl bg-zinc-50/80 dark:bg-zinc-950/60 border border-zinc-200/80 dark:border-zinc-800/80 divide-y divide-zinc-200/60 dark:divide-zinc-800/60 text-xs">
+                {/* Connected Domain */}
+                <div className="flex items-center justify-between pb-3">
+                  <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2 font-medium">
+                    <Globe className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                    <span>Connected Domain</span>
+                  </span>
+                  {shopifyDomain ? (
+                    <div className="flex items-center gap-1.5 max-w-[65%]">
                       <a
                         href={`https://${shopifyDomain}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="font-mono font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline bg-emerald-500/10 dark:bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/20"
+                        className="font-mono text-sm font-semibold text-zinc-900 dark:text-white hover:text-emerald-500 dark:hover:text-emerald-400 truncate flex items-center gap-1 transition-colors"
+                        title={shopifyDomain}
                       >
-                        {shopifyDomain}
-                        <ExternalLink className="h-3 w-3" />
+                        <span className="truncate">{shopifyDomain}</span>
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-70" />
                       </a>
-                    ) : (
-                      <span className="text-zinc-400 italic">Not configured</span>
-                    )}
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(shopifyDomain, "domain")}
+                        className="p-1 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition shrink-0"
+                        title="Copy Domain"
+                      >
+                        {copiedKey === "domain" ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-zinc-400 italic">Not configured</span>
+                  )}
+                </div>
 
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                      <PackageCheck className="h-3.5 w-3.5 text-emerald-500" /> Synced Catalog
-                    </span>
-                    <span className="font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 dark:bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                {/* Catalog Status */}
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2 font-medium">
+                    <PackageCheck className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                    <span>Catalog Status</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-lg border border-emerald-500/20">
                       {syncedShopifyProductCount} Products Synced
                     </span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5 text-zinc-400" /> Last Synchronized
-                    </span>
-                    <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                      {formatSyncTime("shopify", shopifyStoreInfo?.lastSyncedAt || shopifyIntegration?.last_synced_at || shopifyIntegration?.updated_at)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Shopify Live Storefront Widget (when connected) */}
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 space-y-2.5 animate-in fade-in duration-300">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-emerald-500" />
-                      <span className="text-xs font-bold text-zinc-900 dark:text-white">
-                        Shopify Live Storefront Widget
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                      ScriptTag Active
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                    The AutoCommerce AI widget is automatically injected into your Shopify theme via ScriptTag.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2">
                     <button
                       type="button"
-                      onClick={handleViewLiveWidget}
-                      className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                      onClick={handleReSyncShopify}
+                      disabled={syncingPlatform === "shopify" || isDisconnectingShopify}
+                      className="p-1.5 rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800/60 transition disabled:opacity-50"
+                      title="Re-sync catalog now"
                     >
-                      <Eye className="h-4 w-4" />
-                      <span>View Live Widget on Store</span>
-                      <ExternalLink className="h-3.5 w-3.5 ml-0.5 opacity-80" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleReinjectScriptTag}
-                      disabled={isReinjectingScriptTag}
-                      className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
-                    >
-                      <RefreshCw className={`h-3.5 w-3.5 ${isReinjectingScriptTag ? "animate-spin" : ""}`} />
-                      <span>{isReinjectingScriptTag ? "Injecting..." : "Re-inject ScriptTag"}</span>
+                      <RefreshCw
+                        className={`h-3.5 w-3.5 ${
+                          syncingPlatform === "shopify" ? "animate-spin text-emerald-400" : ""
+                        }`}
+                      />
                     </button>
                   </div>
                 </div>
 
-                {/* Actions Bar */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 rounded-2xl min-h-[42px] font-semibold text-xs border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 shadow-sm"
-                    onClick={handleReSyncShopify}
-                    disabled={syncingPlatform === "shopify" || isDisconnectingShopify}
-                  >
-                    <RefreshCw
-                      className={`h-4 w-4 mr-2 ${
-                        syncingPlatform === "shopify" ? "animate-spin text-emerald-500" : "text-emerald-500"
-                      }`}
-                    />
-                    {syncingPlatform === "shopify" ? "Syncing Catalog..." : "Re-sync Catalog"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-2xl min-h-[42px] font-semibold text-xs border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                    onClick={() => setIsShopifyModalOpen(true)}
-                    disabled={isDisconnectingShopify}
-                  >
-                    Change Domain
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-2xl min-h-[42px] font-semibold text-xs border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/50 shadow-sm transition-colors"
-                    onClick={handleDisconnectShopify}
-                    disabled={isDisconnectingShopify || syncingPlatform === "shopify"}
-                  >
-                    {isDisconnectingShopify ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                        <span>Disconnecting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Unlink className="h-4 w-4 mr-1.5" />
-                        <span>Disconnect Store</span>
-                      </>
+                {/* Last Sync */}
+                <div className="flex items-center justify-between pt-3">
+                  <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2 font-medium">
+                    <Clock className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                    <span>Last Sync</span>
+                  </span>
+                  <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                    {formatSyncTime(
+                      "shopify",
+                      shopifyStoreInfo?.lastSyncedAt ||
+                        shopifyIntegration?.last_synced_at ||
+                        shopifyIntegration?.updated_at
                     )}
-                  </Button>
+                  </span>
                 </div>
               </div>
-            )}
-          </div>
+
+              {/* Streamlined Storefront Widget Activation Section */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/20 space-y-3 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-emerald-400" />
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white">
+                      Storefront AI Assistant
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                    ScriptTag Active
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  Your AI Shopping Assistant is automatically injected via Shopify ScriptTag. No theme code edits required.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleViewLiveWidget}
+                    className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+                  >
+                    <ShoppingBag className="h-4 w-4" />
+                    <span>View Live Storefront Assistant</span>
+                    <ExternalLink className="h-3.5 w-3.5 opacity-80" />
+                  </button>
+                  <Link
+                    href="/dashboard/storefront-widget"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white/50 dark:bg-zinc-800/80 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 text-xs font-semibold transition cursor-pointer"
+                  >
+                    <span>Test Widget in Playground</span>
+                    <ArrowRight className="h-3.5 w-3.5 opacity-70" />
+                  </Link>
+                </div>
+              </div>
+
+              {/* Actions Bar (Re-sync, Change Domain, Disconnect) */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 rounded-xl min-h-[40px] font-semibold text-xs border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 shadow-sm"
+                  onClick={handleReSyncShopify}
+                  disabled={syncingPlatform === "shopify" || isDisconnectingShopify}
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 mr-2 ${
+                      syncingPlatform === "shopify" ? "animate-spin text-emerald-500" : "text-emerald-500"
+                    }`}
+                  />
+                  {syncingPlatform === "shopify" ? "Syncing..." : "Re-sync Catalog"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl min-h-[40px] font-semibold text-xs border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  onClick={() => setIsShopifyModalOpen(true)}
+                  disabled={isDisconnectingShopify}
+                >
+                  Change Domain
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl min-h-[40px] font-semibold text-xs border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/50 shadow-sm transition-colors"
+                  onClick={handleDisconnectShopify}
+                  disabled={isDisconnectingShopify || syncingPlatform === "shopify"}
+                >
+                  {isDisconnectingShopify ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      <span>Disconnecting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Unlink className="h-3.5 w-3.5 mr-1.5" />
+                      <span>Disconnect</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* ========================================================================= */}
         {/* 2. WOOCOMMERCE INTEGRATION CARD */}
         {/* ========================================================================= */}
-        <Card className="relative overflow-hidden rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/60 dark:bg-zinc-900/40 backdrop-blur-xl shadow-lg opacity-90">
-          <div className="p-6 sm:p-7 space-y-6">
+        <Card className="relative rounded-3xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white/60 dark:bg-zinc-900/40 backdrop-blur-xl shadow-lg p-6 space-y-4 opacity-90 flex flex-col justify-between">
+          <div className="space-y-4">
             {/* Top Row: Icon, Title, Status Badge */}
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3.5">
-                <div className="h-12 w-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 flex items-center justify-center shrink-0">
-                  <Store className="h-6 w-6" />
+                <div className="h-11 w-11 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 flex items-center justify-center shrink-0">
+                  <Store className="h-5 w-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white">WooCommerce</h3>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-zinc-200/80 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700">
-                      Coming Soon
-                    </span>
-                  </div>
+                  <h3 className="text-lg font-bold text-zinc-900 dark:text-white leading-tight">WooCommerce</h3>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                     Direct WordPress REST credentials sync
                   </p>
@@ -956,9 +979,9 @@ export default function IntegrationsPage() {
               </div>
 
               {/* Status Badge */}
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800/80 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
                 Coming Soon
-              </div>
+              </span>
             </div>
 
             {/* Details Box */}
@@ -967,19 +990,19 @@ export default function IntegrationsPage() {
                 Native WooCommerce plug-and-play synchronization is currently in private preview. Connect your live catalog via the active Shopify integration or custom Webhook ingestion endpoints.
               </p>
             </div>
+          </div>
 
-            {/* Actions Bar */}
-            <div className="pt-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full rounded-2xl min-h-[44px] font-semibold text-xs border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-not-allowed bg-zinc-50 dark:bg-zinc-900/50"
-                disabled
-              >
-                <Store className="h-4 w-4 mr-1.5 opacity-60" />
-                WooCommerce Connector (Coming Soon)
-              </Button>
-            </div>
+          {/* Actions Bar */}
+          <div className="pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full rounded-xl min-h-[40px] font-semibold text-xs border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-not-allowed bg-zinc-50 dark:bg-zinc-900/50"
+              disabled
+            >
+              <Store className="h-4 w-4 mr-1.5 opacity-60" />
+              WooCommerce Connector (Coming Soon)
+            </Button>
           </div>
         </Card>
       </div>
